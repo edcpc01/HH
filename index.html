@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0a1628"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="HealthHome"/>
+<title>HealthHome — Prontuário Digital</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#06101f;--surface:#0d1f38;--surface2:#122846;--surface3:#162f52;--border:#1e3a5f;--accent:#2dd4bf;--accent2:#38bdf8;--accent3:#fb7185;--gold:#fbbf24;--text:#e2eaf4;--text2:#7fa5c8;--text3:#4a6e8f;--success:#34d399;--warn:#fbbf24;--danger:#f87171;--purple:#a78bfa;--radius:16px;--radius-sm:10px;--radius-xs:6px;--shadow:0 4px 32px rgba(0,0,0,0.4);}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:16px;scroll-behavior:smooth;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(45,212,191,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 80% 100%,rgba(56,189,248,0.05) 0%,transparent 60%);pointer-events:none;z-index:0;}
+/* AUTH */
+.auth-screen{position:fixed;inset:0;z-index:9000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;}
+.auth-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;max-width:420px;width:100%;box-shadow:var(--shadow);}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+.auth-logo-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:24px;}
+.auth-logo-name{font-family:'DM Serif Display',serif;font-size:24px;}
+.auth-tabs{display:flex;background:var(--surface2);border-radius:var(--radius-sm);padding:4px;margin-bottom:24px;}
+.auth-tab{flex:1;padding:8px;text-align:center;border-radius:var(--radius-xs);font-size:13px;font-weight:500;cursor:pointer;color:var(--text3);transition:all .2s;}
+.auth-tab.active{background:var(--surface);color:var(--text);}
+.auth-role-pick{display:flex;gap:8px;}
+.auth-role-btn{flex:1;padding:12px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;text-align:center;font-size:12px;color:var(--text2);transition:all .2s;font-family:inherit;}
+.auth-role-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(45,212,191,0.08);}
+.role-icon{font-size:20px;display:block;margin-bottom:4px;}
+/* LAYOUT */
+.app{display:flex;min-height:100vh;position:relative;z-index:1;}
+.sidebar{width:260px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .3s cubic-bezier(.4,0,.2,1);}
+.main{margin-left:260px;flex:1;min-height:100vh;display:flex;flex-direction:column;}
+.topbar{height:64px;background:rgba(13,31,56,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:16px;position:sticky;top:0;z-index:50;}
+.content{flex:1;padding:28px;max-width:1200px;width:100%;}
+/* SIDEBAR */
+.logo{padding:24px 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
+.logo-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;box-shadow:0 0 20px rgba(45,212,191,0.3);}
+.logo-name{font-family:'DM Serif Display',serif;font-size:18px;line-height:1.1;}
+.logo-sub{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
+.profile-switcher{padding:16px 20px;border-bottom:1px solid var(--border);}
+.profile-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.profile-btn{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--text);font-family:inherit;font-size:14px;transition:border-color .2s;}
+.profile-btn:hover{border-color:var(--accent);}
+.profile-avatar{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent3),var(--gold));display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+nav{flex:1;padding:16px 12px;overflow-y:auto;}
+.nav-section-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;padding:0 8px;margin-bottom:6px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius-sm);color:var(--text2);cursor:pointer;font-size:14px;transition:all .15s;margin-bottom:2px;border:1px solid transparent;}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:rgba(45,212,191,0.08);color:var(--accent);border-color:rgba(45,212,191,0.2);}
+.nav-item .icon{width:20px;text-align:center;font-size:16px;flex-shrink:0;}
+.nav-badge{margin-left:auto;background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;padding:2px 6px;border-radius:20px;}
+.sidebar-footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.db-dot{width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;transition:all .3s;}
+.db-dot.offline{background:var(--danger);}
+.db-dot.connecting{background:var(--warn);animation:pulse 1s infinite;}
+@keyframes pulse{50%{opacity:.4;}}
+/* TOPBAR */
+.page-title{font-family:'DM Serif Display',serif;font-size:20px;flex:1;}
+.topbar-actions{display:flex;align-items:center;gap:8px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:none;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:var(--bg);}
+.btn-primary:hover{background:#14c8b0;box-shadow:0 0 20px rgba(45,212,191,0.3);}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--surface2);color:var(--text);}
+.btn-ble{background:rgba(167,139,250,0.1);color:var(--purple);border:1px solid rgba(167,139,250,0.3);}
+.btn-ble:hover,.btn-ble.connected{background:rgba(52,211,153,0.1);color:var(--success);border-color:rgba(52,211,153,0.3);}
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;padding:4px;}
+/* PAGES */
+.page{display:none;animation:fadeIn .3s ease;}
+.page.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.card-title{font-family:'DM Serif Display',serif;font-size:17px;}
+.card-subtitle{font-size:12px;color:var(--text3);margin-top:2px;}
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;transition:all .2s;cursor:pointer;}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.stat-card::after{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:50%;opacity:.07;transform:translate(15px,-15px);}
+.stat-card.teal::after{background:var(--accent);}
+.stat-card.blue::after{background:var(--accent2);}
+.stat-card.pink::after{background:var(--accent3);}
+.stat-card.gold::after{background:var(--gold);}
+.stat-card.purple::after{background:var(--purple);}
+.stat-icon{font-size:20px;margin-bottom:10px;}
+.stat-value{font-family:'DM Serif Display',serif;font-size:26px;line-height:1;}
+.stat-unit{font-size:12px;color:var(--text3);}
+.stat-label{font-size:12px;color:var(--text2);margin-top:3px;}
+.stat-delta{font-size:11px;margin-top:5px;display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:20px;}
+.delta-up{background:rgba(52,211,153,0.1);color:var(--success);}
+.delta-down{background:rgba(248,113,113,0.1);color:var(--danger);}
+.ble-badge{font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(167,139,250,0.1);color:var(--purple);border:1px solid rgba(167,139,250,0.2);display:inline-flex;align-items:center;gap:3px;margin-top:4px;}
+.ble-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--purple);animation:pulse 1s infinite;}
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px;}
+.chart-container{position:relative;height:220px;}
+/* MARKERS */
+.marker-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);}
+.marker-row:last-child{border-bottom:none;}
+.marker-bar-bg{flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+.marker-bar-fill{height:100%;border-radius:3px;transition:width .6s;}
+.marker-bar-fill.ok{background:var(--success);}
+.marker-bar-fill.warn{background:var(--warn);}
+.marker-bar-fill.bad{background:var(--danger);}
+.marker-status{font-size:10px;padding:2px 7px;border-radius:20px;text-transform:uppercase;font-weight:600;flex-shrink:0;width:68px;text-align:center;}
+.status-ok{background:rgba(52,211,153,0.1);color:var(--success);}
+.status-warn{background:rgba(251,191,36,0.1);color:var(--warn);}
+.status-bad{background:rgba(248,113,113,0.1);color:var(--danger);}
+/* TIMELINE */
+.timeline{position:relative;padding-left:28px;}
+.timeline::before{content:'';position:absolute;left:11px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--accent),transparent);}
+.timeline-item{position:relative;margin-bottom:22px;}
+.timeline-dot{position:absolute;left:-28px;top:4px;width:12px;height:12px;border-radius:50%;border:2px solid var(--accent);background:var(--bg);}
+.timeline-dot.exam{border-color:var(--accent2);}
+.timeline-dot.prescription{border-color:var(--gold);}
+.timeline-dot.alert{border-color:var(--danger);}
+.timeline-dot.wearable{border-color:var(--purple);}
+.timeline-date{font-size:11px;color:var(--text3);margin-bottom:4px;}
+.timeline-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;transition:border-color .2s;}
+.timeline-card:hover{border-color:rgba(45,212,191,0.3);}
+.timeline-title{font-size:14px;font-weight:500;margin-bottom:3px;}
+.timeline-desc{font-size:13px;color:var(--text2);line-height:1.5;}
+.timeline-tags{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;}
+.tag{font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--border);color:var(--text3);}
+.tag.teal{border-color:rgba(45,212,191,0.3);color:var(--accent);}
+.tag.purple{border-color:rgba(167,139,250,0.3);color:var(--purple);}
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px 24px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(45,212,191,0.04);}
+.upload-input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:14px;}
+.file-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;flex-direction:column;gap:7px;transition:border-color .2s;}
+.file-card:hover{border-color:rgba(45,212,191,0.3);}
+.file-icon{font-size:26px;}
+.file-name{font-size:12px;font-weight:500;word-break:break-word;}
+.file-meta{font-size:10px;color:var(--text3);}
+.file-type-badge{font-size:9px;padding:2px 6px;border-radius:4px;background:var(--surface2);color:var(--text3);width:fit-content;text-transform:uppercase;}
+.file-actions{display:flex;gap:5px;margin-top:2px;}
+.file-btn{flex:1;padding:5px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;}
+.file-btn:hover{background:var(--border);}
+.file-btn.del:hover{background:rgba(248,113,113,0.1);color:var(--danger);}
+.extract-result{background:rgba(45,212,191,0.04);border:1px solid rgba(45,212,191,0.2);border-radius:var(--radius-sm);padding:14px;margin-top:12px;}
+.extract-title{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:8px;}
+.extract-marker{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.extract-marker:last-child{border-bottom:none;}
+.extract-save-btn{margin-top:10px;width:100%;justify-content:center;}
+/* AI */
+.ai-header{display:flex;align-items:center;gap:12px;padding:20px 24px;background:linear-gradient(135deg,rgba(45,212,191,0.06),rgba(56,189,248,0.04));border-bottom:1px solid var(--border);}
+.ai-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.insight-item{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
+.insight-item:last-child{border-bottom:none;}
+.insight-icon{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.insight-icon.ok{background:rgba(52,211,153,0.1);}
+.insight-icon.warn{background:rgba(251,191,36,0.1);}
+.insight-icon.bad{background:rgba(248,113,113,0.1);}
+.insight-title{font-size:14px;font-weight:500;margin-bottom:3px;}
+.insight-text{font-size:13px;color:var(--text2);line-height:1.6;}
+.chat-area{background:var(--surface2);border-radius:var(--radius);padding:16px;min-height:160px;max-height:320px;overflow-y:auto;border:1px solid var(--border);}
+.chat-msg{margin-bottom:12px;}
+.chat-bubble{display:inline-block;max-width:85%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.6;}
+.chat-bubble.assistant{background:var(--surface);border:1px solid var(--border);border-radius:4px 14px 14px 14px;}
+.chat-bubble.user{background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--bg);font-weight:500;border-radius:14px 14px 4px 14px;}
+.chat-msg.user{text-align:right;}
+.chat-input-row{display:flex;gap:8px;margin-top:10px;}
+.chat-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-family:inherit;font-size:13px;outline:none;resize:none;transition:border-color .2s;}
+.chat-input:focus{border-color:var(--accent);}
+/* WEARABLES */
+.ble-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.ble-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:all .2s;}
+.ble-card.scanning{border-color:var(--purple);box-shadow:0 0 20px rgba(167,139,250,0.08);}
+.ble-card.connected{border-color:var(--success);box-shadow:0 0 20px rgba(52,211,153,0.08);}
+.ble-device-icon{font-size:32px;margin-bottom:12px;}
+.ble-device-name{font-size:15px;font-weight:600;margin-bottom:4px;}
+.ble-device-desc{font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5;}
+.ble-status-badge{font-size:11px;padding:3px 10px;border-radius:20px;width:fit-content;margin-bottom:12px;}
+.ble-status-badge.idle{background:var(--surface2);color:var(--text3);}
+.ble-status-badge.scanning{background:rgba(167,139,250,0.1);color:var(--purple);}
+.ble-status-badge.connected{background:rgba(52,211,153,0.1);color:var(--success);}
+.ble-live{background:var(--surface2);border-radius:var(--radius-sm);padding:14px;margin-top:12px;display:none;text-align:center;}
+.ble-live.show{display:block;}
+.ble-live-value{font-family:'DM Serif Display',serif;font-size:40px;color:var(--accent);}
+.ble-live-unit{font-size:13px;color:var(--text3);margin-top:2px;}
+.ble-live-time{font-size:10px;color:var(--text3);margin-top:6px;}
+.ble-history{max-height:100px;overflow-y:auto;margin-top:10px;}
+.ble-history-item{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);padding:3px 0;border-bottom:1px solid var(--border);}
+.ble-mini-chart{height:80px;margin-top:10px;}
+/* PATIENTS & PRONTUARIO */
+.patient-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;}
+.patient-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;transition:all .2s;}
+.patient-card:hover{border-color:rgba(45,212,191,0.4);transform:translateY(-2px);}
+.patient-avatar{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent2),var(--accent3));display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;}
+.patient-name{font-size:15px;font-weight:600;}
+.patient-info{font-size:12px;color:var(--text3);margin-top:2px;}
+.patient-badges{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;}
+.prontuario-header{display:flex;align-items:flex-start;gap:20px;padding:22px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:20px;}
+.prontuario-avatar{width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,var(--accent2),var(--accent3));display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;}
+.prontuario-tabs{display:flex;background:var(--surface2);border-radius:var(--radius-sm);padding:4px;margin-bottom:18px;overflow-x:auto;gap:2px;}
+.prontuario-tab{padding:7px 14px;border-radius:var(--radius-xs);font-size:13px;cursor:pointer;color:var(--text3);white-space:nowrap;transition:all .2s;}
+.prontuario-tab.active{background:var(--surface);color:var(--text);}
+.prontuario-section{display:none;}
+.prontuario-section.active{display:block;}
+.vitals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+.vital-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;}
+.vital-val{font-family:'DM Serif Display',serif;font-size:22px;margin:5px 0;}
+.vital-label{font-size:11px;color:var(--text3);}
+/* SETTINGS */
+.setup-panel{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px;}
+.form-group{display:flex;flex-direction:column;gap:6px;}
+.form-label{font-size:13px;color:var(--text2);font-weight:500;}
+.form-hint{font-size:11px;color:var(--text3);}
+.form-input{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--accent);}
+.form-select{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;cursor:pointer;}
+.api-key-row{position:relative;}
+.api-key-row .form-input{width:100%;padding-right:44px;}
+.eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;}
+.alert-box{border-radius:var(--radius-sm);padding:13px 15px;display:flex;gap:10px;align-items:flex-start;}
+.alert-box.info{background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.2);}
+.alert-box.warn{background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);}
+.alert-box.success{background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.2);}
+.alert-text{font-size:13px;color:var(--text2);line-height:1.5;}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;max-width:480px;width:100%;box-shadow:var(--shadow);animation:modalIn .25s ease;max-height:90vh;overflow-y:auto;}
+@keyframes modalIn{from{opacity:0;transform:scale(.95);}to{opacity:1;transform:none;}}
+.modal-title{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:6px;}
+.modal-sub{font-size:13px;color:var(--text3);margin-bottom:20px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+/* TOAST */
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:1000;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:13px 17px;min-width:240px;max-width:340px;display:flex;align-items:center;gap:9px;font-size:13px;box-shadow:var(--shadow);animation:toastIn .3s ease;}
+.toast.success{border-left:3px solid var(--success);}
+.toast.error{border-left:3px solid var(--danger);}
+.toast.info{border-left:3px solid var(--accent);}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:none;}}
+/* MISC */
+.spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--accent);animation:spin .6s linear infinite;display:inline-block;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-bar{height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));position:fixed;top:0;left:0;z-index:9999;transition:width .3s;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.mt-4{margin-top:16px;}
+.mb-4{margin-bottom:16px;}
+.flex-between{display:flex;align-items:center;justify-content:space-between;}
+.gap-row{display:flex;align-items:center;gap:8px;}
+.empty-state{text-align:center;padding:40px 24px;}
+.empty-icon{font-size:44px;opacity:.3;margin-bottom:10px;}
+.empty-title{font-size:15px;color:var(--text2);margin-bottom:5px;}
+.empty-sub{font-size:13px;color:var(--text3);}
+.section-title{font-family:'DM Serif Display',serif;font-size:16px;margin-bottom:14px;}
+.divider{height:1px;background:var(--border);margin:8px 0;}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:none;}
+  .main{margin-left:0;}
+  .hamburger{display:flex;}
+  .charts-grid,.ble-grid,.grid-2{grid-template-columns:1fr;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .content{padding:16px;}
+}
+</style>
+</head>
+<body>
+<div id="loadingBar" class="loading-bar" style="width:0%"></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🫀</div>
+      <div>
+        <div class="auth-logo-name">HealthHome</div>
+        <div style="font-size:12px;color:var(--text3);">Prontuário Digital Inteligente</div>
+      </div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Entrar</div>
+      <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Cadastrar</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="form-group"><label class="form-label">E-mail</label><input class="form-input" id="authEmail" type="email" placeholder="seu@email.com"/></div>
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <div class="api-key-row"><input class="form-input" id="authPass" type="password" placeholder="••••••••"/><button class="eye-btn" onclick="toggleEye('authPass')">👁️</button></div>
+      </div>
+      <div id="registerExtra" style="display:none;flex-direction:column;gap:12px;">
+        <div class="form-group"><label class="form-label">Nome completo</label><input class="form-input" id="authName" placeholder="Seu nome"/></div>
+        <div class="form-group">
+          <label class="form-label">Perfil</label>
+          <div class="auth-role-pick">
+            <button class="auth-role-btn active" id="rolePatient" onclick="setRole('patient')"><span class="role-icon">🫀</span>Paciente</button>
+            <button class="auth-role-btn" id="roleDoctor" onclick="setRole('doctor')"><span class="role-icon">🩺</span>Médico</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="handleAuth()"><span id="authBtnText">Entrar</span></button>
+      <div style="text-align:center;font-size:12px;color:var(--text3);">— ou —</div>
+      <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="enterDemoMode()">🎮 Continuar em modo demo</button>
+      <div id="authStatus" style="font-size:13px;min-height:20px;text-align:center;"></div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;">Configure o Supabase nas Configurações para auth real</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-title">Trocar Perfil</div>
+    <div class="modal-sub">Selecione o modo de uso</div>
+    <div id="profileList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('profileModal')">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="newPatientModal">
+  <div class="modal">
+    <div class="modal-title">Novo Paciente</div>
+    <div class="modal-sub">Cadastrar no prontuário</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="form-group"><label class="form-label">Nome completo</label><input class="form-input" id="npName" placeholder="Ex: João Silva"/></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nascimento</label><input class="form-input" id="npDob" type="date"/></div>
+        <div class="form-group"><label class="form-label">Sexo</label><select class="form-select" id="npSex"><option value="M">Masculino</option><option value="F">Feminino</option><option value="O">Outro</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">CID / Diagnósticos</label><input class="form-input" id="npConditions" placeholder="Ex: E11 - Diabetes Tipo 2"/></div>
+      <div class="form-group"><label class="form-label">Contato de emergência</label><input class="form-input" id="npEmergency" placeholder="Nome — (11) 99999-9999"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('newPatientModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveNewPatient()">Cadastrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addEventModal">
+  <div class="modal">
+    <div class="modal-title">Novo Evento</div>
+    <div class="modal-sub">Adicionar à linha do tempo</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="evType"><option value="exam">🔬 Exame</option><option value="consultation">🩺 Consulta</option><option value="prescription">💊 Prescrição</option><option value="alert">⚠️ Alerta</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Título</label><input class="form-input" id="evTitle" placeholder="Ex: Hemograma Completo"/></div>
+      <div class="form-group"><label class="form-label">Data</label><input class="form-input" id="evDate" type="date"/></div>
+      <div class="form-group"><label class="form-label">Descrição</label><textarea class="form-input" id="evDesc" rows="3" style="resize:vertical;" placeholder="Detalhes..."></textarea></div>
+      <div class="form-group"><label class="form-label">Tags (vírgula)</label><input class="form-input" id="evTags" placeholder="Ex: Cardiologia, Preventivo"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('addEventModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEvent()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addMarkerModal">
+  <div class="modal">
+    <div class="modal-title">Registrar Marcador</div>
+    <div class="modal-sub">Medição manual ou importada</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="form-group"><label class="form-label">Marcador</label>
+        <select class="form-select" id="mkKey">
+          <option value="glucose">Glicose (mg/dL)</option>
+          <option value="cholesterol">Colesterol Total (mg/dL)</option>
+          <option value="pressure_sys">Pressão Sistólica (mmHg)</option>
+          <option value="pressure_dia">Pressão Diastólica (mmHg)</option>
+          <option value="hemoglobin">Hemoglobina (g/dL)</option>
+          <option value="triglycerides">Triglicerídeos (mg/dL)</option>
+          <option value="heart_rate">Freq. Cardíaca (bpm)</option>
+          <option value="spo2">SpO2 (%)</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Valor</label><input class="form-input" id="mkValue" type="number" step="0.1" placeholder="0.0"/></div>
+      <div class="form-group"><label class="form-label">Data/Hora</label><input class="form-input" id="mkDate" type="datetime-local"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('addMarkerModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveMarker()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <div class="logo-icon">🫀</div>
+      <div><div class="logo-name">HealthHome</div><div class="logo-sub">Prontuário Digital</div></div>
+    </div>
+    <div class="profile-switcher">
+      <div class="profile-label">Perfil ativo</div>
+      <button class="profile-btn" onclick="openModal('profileModal')">
+        <div class="profile-avatar" id="sidebarAvatar">🫀</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:500;" id="sidebarName">—</div>
+          <div style="font-size:10px;color:var(--text3);" id="sidebarRole">—</div>
+        </div>
+        <span style="color:var(--text3);font-size:10px;">▼</span>
+      </button>
+    </div>
+    <nav id="sidebarNav"></nav>
+    <div class="sidebar-footer">
+      <div class="db-dot connecting" id="dbDot"></div>
+      <span style="font-size:12px;color:var(--text3);" id="dbText">Verificando...</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+      <div class="page-title" id="topbarTitle">Dashboard</div>
+      <div class="topbar-actions" id="topbarActions"></div>
+    </header>
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Evolução de Marcadores</div><div class="card-subtitle">Últimos registros</div></div>
+              <select class="form-select" id="markerSelect" style="width:150px;padding:6px 10px;" onchange="updateMainChart()">
+                <option value="glucose">Glicose</option>
+                <option value="cholesterol">Colesterol</option>
+                <option value="pressure_sys">P. Sistólica</option>
+                <option value="hemoglobin">Hemoglobina</option>
+                <option value="heart_rate">Freq. Cardíaca</option>
+                <option value="spo2">SpO2</option>
+              </select>
+            </div>
+            <div class="chart-container"><canvas id="mainChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Status Geral</div></div>
+            <div class="chart-container"><canvas id="radarChart"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Marcadores</div>
+              <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;" onclick="openAddMarker()">+ Registrar</button>
+            </div>
+            <div id="markersTable"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Resumo de Saúde</div></div>
+            <div id="healthSummary"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div class="page" id="page-timeline">
+        <div class="flex-between mb-4">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="timelineFilters"></div>
+          <button class="btn btn-ghost" onclick="openModal('addEventModal')">+ Evento</button>
+        </div>
+        <div class="timeline" id="timelineContainer"></div>
+      </div>
+
+      <!-- UPLOAD -->
+      <div class="page" id="page-upload">
+        <div class="grid-2">
+          <div>
+            <div class="card mb-4">
+              <div class="upload-zone" id="uploadZone">
+                <input type="file" class="upload-input" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.webp"/>
+                <div style="font-size:36px;margin-bottom:10px;opacity:.6;">📁</div>
+                <div style="font-size:15px;font-weight:500;margin-bottom:5px;">Soltar arquivos aqui</div>
+                <div style="font-size:13px;color:var(--text3);">PDF, JPG, PNG — até 50MB</div>
+              </div>
+            </div>
+            <!-- AI EXTRACTION RESULT -->
+            <div id="extractionPanel" style="display:none;"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Documentos</div>
+              <span style="font-size:12px;color:var(--text3);" id="fileCount"></span>
+            </div>
+            <div class="files-grid" id="filesGrid"></div>
+            <div class="empty-state" id="filesEmpty">
+              <div class="empty-icon">📂</div>
+              <div class="empty-title">Nenhum documento</div>
+              <div class="empty-sub">Faça upload dos seus exames</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INSIGHTS -->
+      <div class="page" id="page-insights">
+        <div class="card mb-4" style="padding:0;overflow:hidden;">
+          <div class="ai-header" style="border-radius:var(--radius) var(--radius) 0 0;">
+            <div class="ai-icon">🧠</div>
+            <div style="flex:1;">
+              <div style="font-family:'DM Serif Display',serif;font-size:18px;">Análise Inteligente</div>
+              <div style="font-size:12px;color:var(--text3);">Baseada nos seus marcadores. Não substitui consulta médica.</div>
+            </div>
+            <button class="btn btn-primary" onclick="generateInsights()"><span id="insightsBtnText">✨ Gerar Análise</span></button>
+          </div>
+          <div style="padding:24px;" id="insightsBody">
+            <div class="empty-state" style="padding:32px 0;">
+              <div class="empty-icon">💡</div>
+              <div class="empty-title">Análise não gerada</div>
+              <div class="empty-sub">Clique em "Gerar Análise" para receber insights com IA</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="ai-header" style="border-radius:var(--radius) var(--radius) 0 0;">
+            <div class="ai-icon" style="width:36px;height:36px;font-size:16px;">💬</div>
+            <div><div style="font-size:15px;font-weight:500;">Perguntar sobre minha saúde</div><div style="font-size:12px;color:var(--text3);">Converse com a IA sobre seus dados</div></div>
+          </div>
+          <div style="padding:20px;">
+            <div class="chat-area" id="chatArea"></div>
+            <div class="chat-input-row">
+              <textarea class="chat-input" id="chatInput" rows="1" placeholder="Ex: Minha glicose está controlada?" onkeydown="handleChatKey(event)"></textarea>
+              <button class="btn btn-primary" onclick="sendChat()">Enviar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WEARABLES -->
+      <div class="page" id="page-wearables">
+        <div class="alert-box info mb-4">
+          <span>ℹ️</span>
+          <span class="alert-text">Bluetooth Web API funciona no Chrome/Edge em Android e Desktop. iOS Safari tem suporte limitado. Certifique-se que o Bluetooth está ativado no dispositivo.</span>
+        </div>
+        <div class="ble-grid" id="bleGrid"></div>
+        <div class="card mt-4">
+          <div class="card-header"><div class="card-title">📊 Leituras em Tempo Real</div></div>
+          <div class="chart-container"><canvas id="bleRealtimeChart"></canvas></div>
+        </div>
+        <div class="card mt-4">
+          <div class="card-header">
+            <div class="card-title">📋 Log de Leituras BLE</div>
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="clearBleLog()">Limpar</button>
+          </div>
+          <div id="bleLog" style="max-height:200px;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <!-- PATIENTS (médico) -->
+      <div class="page" id="page-patients">
+        <div class="flex-between mb-4">
+          <input class="form-input" style="max-width:280px;" placeholder="🔍 Buscar paciente..." oninput="filterPatients(this.value)"/>
+          <button class="btn btn-primary" onclick="openModal('newPatientModal')">+ Novo Paciente</button>
+        </div>
+        <div class="patient-grid" id="patientGrid"></div>
+      </div>
+
+      <!-- PRONTUARIO PACIENTE (médico) -->
+      <div class="page" id="page-prontuario">
+        <button class="btn btn-ghost mb-4" onclick="navigate('patients')">← Voltar</button>
+        <div class="prontuario-header" id="prontuarioHeader"></div>
+        <div class="prontuario-tabs" id="prontuarioTabs">
+          <div class="prontuario-tab active" onclick="switchProntuarioTab('vitals',this)">Sinais Vitais</div>
+          <div class="prontuario-tab" onclick="switchProntuarioTab('history',this)">Histórico</div>
+          <div class="prontuario-tab" onclick="switchProntuarioTab('docs',this)">Documentos</div>
+          <div class="prontuario-tab" onclick="switchProntuarioTab('notes',this)">Anotações</div>
+        </div>
+        <div class="prontuario-section active" id="pTab-vitals">
+          <div class="vitals-grid" id="prontuarioVitals"></div>
+          <div class="card mt-4"><div class="card-header"><div class="card-title">Evolução</div></div><div class="chart-container"><canvas id="prontuarioChart"></canvas></div></div>
+        </div>
+        <div class="prontuario-section" id="pTab-history">
+          <div class="timeline" id="prontuarioTimeline"></div>
+        </div>
+        <div class="prontuario-section" id="pTab-docs">
+          <div class="files-grid" id="prontuarioDocs"></div>
+        </div>
+        <div class="prontuario-section" id="pTab-notes">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <textarea class="form-input" id="prontuarioNotes" rows="8" style="resize:vertical;" placeholder="Anotações clínicas, evolução, observações..."></textarea>
+            <button class="btn btn-primary" style="width:fit-content;" onclick="saveNotes()">💾 Salvar Anotações</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="page-settings">
+        <div class="setup-panel">
+          <div class="alert-box info">
+            <span>ℹ️</span>
+            <span class="alert-text">Chaves salvas localmente no navegador. Nunca enviadas a servidores terceiros.</span>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">🗄️ Supabase</div></div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="form-group"><label class="form-label">Project URL</label><input class="form-input" id="cfgUrl" placeholder="https://xxxx.supabase.co"/><span class="form-hint">Settings → API</span></div>
+              <div class="form-group"><label class="form-label">Anon Key</label><div class="api-key-row"><input class="form-input" id="cfgKey" type="password" placeholder="eyJhbGci..."/><button class="eye-btn" onclick="toggleEye('cfgKey')">👁️</button></div></div>
+              <button class="btn btn-primary" onclick="testSupabase()">Salvar & Testar</button>
+              <div id="supabaseResult" style="font-size:13px;"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">🧠 Anthropic Claude</div></div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="form-group"><label class="form-label">API Key</label><div class="api-key-row"><input class="form-input" id="cfgAnthropic" type="password" placeholder="sk-ant-..."/><button class="eye-btn" onclick="toggleEye('cfgAnthropic')">👁️</button></div><span class="form-hint">console.anthropic.com</span></div>
+              <button class="btn btn-primary" onclick="saveAnthropicKey()">Salvar Chave</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">👤 Meu Perfil</div></div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="form-group"><label class="form-label">Nome</label><input class="form-input" id="cfgName" placeholder="Seu nome"/></div>
+              <div class="form-group"><label class="form-label">Data de nascimento</label><input class="form-input" id="cfgDob" type="date"/></div>
+              <div class="form-group"><label class="form-label">Tipo</label><select class="form-select" id="cfgRole"><option value="patient">Paciente</option><option value="doctor">Médico</option></select></div>
+              <button class="btn btn-primary" onclick="saveProfile()">Salvar</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">🗑️ Dados</div></div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div class="alert-box warn"><span>⚠️</span><span class="alert-text">Aviso LGPD: MVP de testes. Não use dados reais de pacientes sem criptografia e conformidade legal.</span></div>
+              <button class="btn" style="background:rgba(248,113,113,0.1);color:var(--danger);border:1px solid rgba(248,113,113,0.2);" onclick="clearAllData()">🗑️ Limpar todos os dados locais</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// CONFIG & STATE
+// =====================================================
+const CFG_KEY = 'hh_config_v2';
+let cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+
+let S = {
+  page: 'dashboard',
+  profile: cfg.role || 'patient',
+  user: null,
+  demo: false,
+  files: [],
+  patients: [],
+  timeline: [],
+  markers: {},
+  bleDevices: {},
+  bleChartData: { labels: [], data: [] },
+  chatHistory: [],
+  currentPatient: null,
+  prontuarioTab: 'vitals',
+};
+
+const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+let selectedRole = 'patient';
+
+// SEED DEMO DATA
+function seedDemoData() {
+  S.markers = {
+    glucose:       [82,95,88,102,91,87,93,85],
+    cholesterol:   [198,210,205,220,195,188,192,184],
+    pressure_sys:  [118,125,122,130,120,116,118,114],
+    pressure_dia:  [78,82,80,85,79,76,77,74],
+    hemoglobin:    [13.8,14.1,13.5,14.4,14.2,13.9,14.0,14.3],
+    triglycerides: [145,160,138,175,148,132,140,128],
+    heart_rate:    [72,75,70,78,71,68,72,70],
+    spo2:          [98,97,98,99,98,97,98,99],
+  };
+  S.timeline = [
+    {id:1,date:'2025-11-15',type:'exam',title:'Hemograma Completo',desc:'Valores dentro da normalidade. Hemoglobina 14.2 g/dL.',tags:['Hematologia','Preventivo']},
+    {id:2,date:'2025-10-03',type:'consultation',title:'Consulta Clínico Geral',desc:'Revisão anual. Solicitados novos exames.',tags:['Clínica Geral']},
+    {id:3,date:'2025-08-20',type:'exam',title:'Perfil Lipídico',desc:'Colesterol 220 mg/dL — levemente elevado.',tags:['Cardiologia','Alerta']},
+    {id:4,date:'2025-06-10',type:'prescription',title:'Vitamina D 2000UI',desc:'Suplementação por 90 dias.',tags:['Suplementação']},
+    {id:5,date:'2025-04-01',type:'exam',title:'Glicemia em Jejum',desc:'Glicose 102 mg/dL — atenção.',tags:['Endocrinologia']},
+  ];
+  S.patients = [
+    {id:1,name:'Ana Beatriz Costa',dob:'1985-03-22',sex:'F',conditions:'Hipertensão, Diabetes T2',emergency:'Carlos Costa — (11) 91234-5678',notes:'Paciente controlada. Monitorar glicemia mensalmente.'},
+    {id:2,name:'Roberto Alves',dob:'1972-11-08',sex:'M',conditions:'Dislipidemia',emergency:'',notes:'Ajuste alimentar em curso.'},
+    {id:3,name:'Carla Mendes',dob:'1991-07-14',sex:'F',conditions:'Anemia Ferropriva',emergency:'',notes:'Reposição de ferro IV concluída.'},
+  ];
+  S.files = [];
+}
+
+// =====================================================
+// SUPABASE HELPERS
+// =====================================================
+async function sbFetch(path, opts = {}) {
+  if (!cfg.supabaseUrl || !cfg.supabaseKey) throw new Error('Supabase não configurado');
+  const resp = await fetch(`${cfg.supabaseUrl}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      'apikey': cfg.supabaseKey,
+      'Authorization': `Bearer ${cfg.supabaseKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts.headers || {}),
+    }
+  });
+  if (!resp.ok) { const e = await resp.text(); throw new Error(e); }
+  return resp.status === 204 ? null : resp.json();
+}
+
+async function loadFromSupabase() {
+  if (!cfg.supabaseUrl || !cfg.supabaseKey || !S.user) return false;
+  try {
+    const [markers, timeline, patients, files] = await Promise.allSettled([
+      sbFetch('health_markers?user_id=eq.' + S.user.id + '&order=recorded_at.desc&limit=200'),
+      sbFetch('timeline_events?user_id=eq.' + S.user.id + '&order=date.desc'),
+      sbFetch('patients?doctor_id=eq.' + S.user.id + '&order=name.asc'),
+      sbFetch('documents?user_id=eq.' + S.user.id + '&order=uploaded_at.desc'),
+    ]);
+
+    if (markers.status === 'fulfilled' && markers.value?.length) {
+      const grouped = {};
+      markers.value.forEach(m => {
+        if (!grouped[m.marker_key]) grouped[m.marker_key] = [];
+        grouped[m.marker_key].unshift(m.value);
+      });
+      S.markers = { ...S.markers, ...grouped };
+    }
+    if (timeline.status === 'fulfilled' && timeline.value?.length) S.timeline = timeline.value;
+    if (patients.status === 'fulfilled' && patients.value?.length) S.patients = patients.value;
+    if (files.status === 'fulfilled' && files.value?.length) S.files = files.value;
+    return true;
+  } catch(e) { console.error('Supabase load:', e); return false; }
+}
+
+async function saveMarkerToSupabase(key, value) {
+  if (!cfg.supabaseUrl || !cfg.supabaseKey || !S.user) return;
+  try {
+    await sbFetch('health_markers', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: S.user.id, marker_key: key, value, recorded_at: new Date().toISOString() })
+    });
+  } catch(e) { console.error('Save marker:', e); }
+}
+
+async function saveEventToSupabase(ev) {
+  if (!cfg.supabaseUrl || !cfg.supabaseKey || !S.user) return;
+  try {
+    await sbFetch('timeline_events', {
+      method: 'POST',
+      body: JSON.stringify({ ...ev, user_id: S.user.id })
+    });
+  } catch(e) { console.error('Save event:', e); }
+}
+
+async function savePatientToSupabase(p) {
+  if (!cfg.supabaseUrl || !cfg.supabaseKey || !S.user) return;
+  try {
+    await sbFetch('patients', { method: 'POST', body: JSON.stringify({ ...p, doctor_id: S.user.id }) });
+  } catch(e) { console.error('Save patient:', e); }
+}
+
+// =====================================================
+// AUTH
+// =====================================================
+let authMode = 'login';
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', mode === 'register');
+  document.getElementById('authBtnText').textContent = mode === 'login' ? 'Entrar' : 'Criar Conta';
+  const extra = document.getElementById('registerExtra');
+  extra.style.display = mode === 'register' ? 'flex' : 'none';
+}
+
+function setRole(r) {
+  selectedRole = r;
+  document.getElementById('rolePatient').classList.toggle('active', r === 'patient');
+  document.getElementById('roleDoctor').classList.toggle('active', r === 'doctor');
+}
+
+async function handleAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPass').value;
+  const statusEl = document.getElementById('authStatus');
+
+  if (!email || !pass) { statusEl.innerHTML = '<span style="color:var(--danger);">Preencha e-mail e senha.</span>'; return; }
+
+  if (!cfg.supabaseUrl || !cfg.supabaseKey) {
+    statusEl.innerHTML = '<span style="color:var(--warn);">Supabase não configurado. Use o modo demo.</span>';
+    return;
+  }
+
+  statusEl.innerHTML = '<span class="spinner"></span>';
+
+  const endpoint = authMode === 'login' ? 'token?grant_type=password' : 'signup';
+  try {
+    const body = authMode === 'login'
+      ? `email=${encodeURIComponent(email)}&password=${encodeURIComponent(pass)}`
+      : JSON.stringify({ email, password: pass, data: { name: document.getElementById('authName').value, role: selectedRole } });
+
+    const resp = await fetch(`${cfg.supabaseUrl}/auth/v1/${endpoint}`, {
+      method: 'POST',
+      headers: { 'apikey': cfg.supabaseKey, 'Content-Type': authMode === 'login' ? 'application/x-www-form-urlencoded' : 'application/json' },
+      body,
+    });
+    const data = await resp.json();
+    if (data.error || data.error_description) throw new Error(data.error_description || data.error);
+
+    cfg.supabaseToken = data.access_token;
+    cfg.supabaseKey = data.access_token || cfg.supabaseKey;
+    S.user = data.user || { id: data.user?.id, email };
+    cfg.role = data.user?.user_metadata?.role || selectedRole;
+    S.profile = cfg.role;
+    saveConfig();
+
+    statusEl.innerHTML = '<span style="color:var(--success);">✓ Autenticado!</span>';
+    await bootApp();
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:var(--danger);">${e.message}</span>`;
+  }
+}
+
+function enterDemoMode() {
+  S.demo = true;
+  S.user = { id: 'demo', email: 'demo@vitasafe.app' };
+  S.profile = cfg.role || 'patient';
+  seedDemoData();
+  bootApp();
+}
+
+async function bootApp() {
+  loadingBar(40);
+  document.getElementById('authScreen').style.display = 'none';
+
+  if (!S.demo) {
+    const loaded = await loadFromSupabase();
+    if (!loaded) { seedDemoData(); }
+  }
+
+  updateSidebarProfile();
+  renderNav();
+  setupUploadZone();
+  renderDashboard();
+  setupBleGrid();
+  initChatWelcome();
+  updateDbStatus(!S.demo && !!cfg.supabaseUrl);
+  loadingBar(100);
+}
+
+// =====================================================
+// NAV
+// =====================================================
+const NAV_PATIENT = [
+  {id:'dashboard',icon:'📊',label:'Dashboard'},
+  {id:'wearables',icon:'📡',label:'Wearables BLE'},
+  {id:'timeline',icon:'📅',label:'Linha do Tempo'},
+  {id:'upload',icon:'📁',label:'Documentos'},
+  {id:'insights',icon:'🧠',label:'Insights IA'},
+  {id:'settings',icon:'⚙️',label:'Configurações'},
+];
+const NAV_DOCTOR = [
+  {id:'dashboard',icon:'📊',label:'Painel'},
+  {id:'patients',icon:'👥',label:'Pacientes',badge:()=>S.patients.length},
+  {id:'wearables',icon:'📡',label:'Wearables'},
+  {id:'timeline',icon:'📅',label:'Histórico'},
+  {id:'upload',icon:'📁',label:'Documentos'},
+  {id:'insights',icon:'🧠',label:'Insights IA'},
+  {id:'settings',icon:'⚙️',label:'Configurações'},
+];
+
+function renderNav() {
+  const items = S.profile === 'doctor' ? NAV_DOCTOR : NAV_PATIENT;
+  document.getElementById('sidebarNav').innerHTML = `
+    <div style="margin-bottom:6px;"><div class="nav-section-label">Menu</div>
+    ${items.map(it => `
+      <div class="nav-item ${S.page === it.id ? 'active' : ''}" onclick="navigate('${it.id}')">
+        <span class="icon">${it.icon}</span><span>${it.label}</span>
+        ${it.badge ? `<span class="nav-badge">${it.badge()}</span>` : ''}
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+      <div class="nav-item" onclick="logout()" style="color:var(--danger);">
+        <span class="icon">🚪</span><span>Sair</span>
+      </div>
+    </div>`;
+}
+
+function navigate(page) {
+  S.page = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page)?.classList.add('active');
+  const labels = {dashboard:'Dashboard',timeline:'Linha do Tempo',upload:'Documentos',insights:'Insights IA',settings:'Configurações',patients:'Pacientes',wearables:'Wearables & BLE',prontuario:'Prontuário do Paciente'};
+  document.getElementById('topbarTitle').textContent = labels[page] || page;
+  renderNav();
+  renderTopbarActions(page);
+  if (page === 'upload') renderFiles();
+  if (page === 'timeline') renderTimeline();
+  if (page === 'patients') renderPatients();
+  if (page === 'settings') loadSettings();
+  if (page === 'wearables') renderBleLog();
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function renderTopbarActions(page) {
+  const el = document.getElementById('topbarActions');
+  const bleConnected = Object.values(S.bleDevices).some(d => d.connected);
+  const bleBtn = `<button class="btn btn-ble ${bleConnected ? 'connected' : ''}" onclick="navigate('wearables')">📡 ${bleConnected ? 'BLE Ativo' : 'Wearables'}</button>`;
+  if (page === 'dashboard') el.innerHTML = bleBtn + `<button class="btn btn-ghost" onclick="navigate('insights')">✨ Insights</button>`;
+  else if (page === 'upload') el.innerHTML = `<button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">+ Upload</button>`;
+  else el.innerHTML = bleBtn;
+}
+
+function updateSidebarProfile() {
+  const icon = S.profile === 'doctor' ? '🩺' : '🫀';
+  const role = S.profile === 'doctor' ? 'Médico / Profissional' : 'Paciente';
+  document.getElementById('sidebarAvatar').textContent = icon;
+  document.getElementById('sidebarName').textContent = cfg.name || S.user?.email?.split('@')[0] || 'Usuário';
+  document.getElementById('sidebarRole').textContent = role;
+}
+
+// =====================================================
+// PROFILE MODAL
+// =====================================================
+function openModal(id) {
+  if (id === 'profileModal') {
+    document.getElementById('profileList').innerHTML = ['patient','doctor'].map(p => `
+      <div onclick="switchProfile('${p}')" style="display:flex;align-items:center;gap:12px;padding:13px;
+        background:${S.profile===p?'rgba(45,212,191,0.08)':'var(--surface2)'};
+        border:1px solid ${S.profile===p?'rgba(45,212,191,0.3)':'var(--border)'};
+        border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;">
+        <div style="font-size:28px;">${p==='patient'?'🫀':'🩺'}</div>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:500;">${p==='patient'?'Paciente':'Médico / Profissional'}</div>
+        <div style="font-size:11px;color:var(--text3);">${p==='patient'?'Gerencie sua saúde pessoal':'Gerencie seus pacientes'}</div></div>
+        ${S.profile===p?'<span style="color:var(--accent);">✓</span>':''}
+      </div>`).join('');
+  }
+  if (id === 'addMarkerModal') {
+    document.getElementById('mkDate').value = new Date().toISOString().slice(0,16);
+  }
+  if (id === 'addEventModal') {
+    document.getElementById('evDate').value = new Date().toISOString().slice(0,10);
+  }
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open'); });
+
+function switchProfile(p) {
+  S.profile = p; cfg.role = p; saveConfig();
+  closeModal('profileModal');
+  updateSidebarProfile(); renderNav(); renderDashboard();
+  toast(`Perfil: ${p === 'patient' ? 'Paciente' : 'Médico'}`, 'info');
+}
+
+function openAddMarker() { openModal('addMarkerModal'); }
+
+// =====================================================
+// CHARTS
+// =====================================================
+let mainChart, radarChart, prontuarioChartInst, bleRTChart;
+
+const MARKER_META = {
+  glucose:       {label:'Glicose',      unit:'mg/dL', ref:[70,99],    color:'#2dd4bf'},
+  cholesterol:   {label:'Colesterol',   unit:'mg/dL', ref:[0,199],    color:'#38bdf8'},
+  pressure_sys:  {label:'P.Sistólica',  unit:'mmHg',  ref:[90,130],   color:'#fb7185'},
+  pressure_dia:  {label:'P.Diastólica', unit:'mmHg',  ref:[60,85],    color:'#f472b6'},
+  hemoglobin:    {label:'Hemoglobina',  unit:'g/dL',  ref:[12,17],    color:'#fbbf24'},
+  triglycerides: {label:'Triglicerídeos',unit:'mg/dL',ref:[0,150],   color:'#a78bfa'},
+  heart_rate:    {label:'Freq.Cardíaca',unit:'bpm',   ref:[60,100],   color:'#34d399'},
+  spo2:          {label:'SpO2',         unit:'%',     ref:[95,100],   color:'#60a5fa'},
+};
+
+function chartDefaults(ctx, color) {
+  const g = ctx.createLinearGradient(0,0,0,220);
+  g.addColorStop(0, color+'38'); g.addColorStop(1, color+'00');
+  return g;
+}
+
+function updateMainChart() {
+  const key = document.getElementById('markerSelect').value;
+  const meta = MARKER_META[key] || MARKER_META.glucose;
+  const rawData = S.markers[key] || [];
+  const data = rawData.slice(-8);
+  const labels = data.map((_,i) => {
+    const d = new Date(); d.setMonth(d.getMonth() - (data.length-1-i));
+    return MONTHS[d.getMonth()];
+  });
+
+  if (mainChart) mainChart.destroy();
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  mainChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[{label:`${meta.label} (${meta.unit})`,data,borderColor:meta.color,backgroundColor:chartDefaults(ctx,meta.color),borderWidth:2.5,pointBackgroundColor:meta.color,pointRadius:5,pointHoverRadius:7,fill:true,tension:0.4}] },
+    options:{ responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1f38',borderColor:'#1e3a5f',borderWidth:1}},scales:{ x:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:11}}},y:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:11}}} } }
+  });
+}
+
+function renderRadarChart() {
+  if (radarChart) radarChart.destroy();
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  const get = k => S.markers[k]?.at(-1) || 0;
+  const scores = [
+    Math.max(0, 100 - Math.abs(get('glucose') - 85)*1.5),
+    Math.max(0, 100 - Math.max(0, get('cholesterol') - 180)*0.8),
+    Math.max(0, 100 - Math.max(0, get('pressure_sys') - 120)*2),
+    Math.max(0, Math.min(100, get('hemoglobin')*6)),
+    Math.max(0, 100 - Math.max(0, get('triglycerides') - 130)*0.5),
+    Math.max(0, 100 - Math.abs(get('heart_rate') - 70)*0.8),
+  ];
+  radarChart = new Chart(ctx, {
+    type:'radar',
+    data:{labels:['Glicose','Colesterol','Pressão','Hemoglobina','Triglicerídeos','Freq.Card.'],datasets:[{data:scores,backgroundColor:'rgba(45,212,191,0.12)',borderColor:'#2dd4bf',pointBackgroundColor:'#2dd4bf',borderWidth:2,pointRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{r:{min:0,max:100,grid:{color:'#1e3a5f'},angleLines:{color:'#1e3a5f'},pointLabels:{color:'#7fa5c8',font:{size:9}},ticks:{display:false}}}}
+  });
+}
+
+function renderMarkersTable() {
+  const el = document.getElementById('markersTable');
+  const keys = ['glucose','cholesterol','pressure_sys','hemoglobin','triglycerides','heart_rate'];
+  el.innerHTML = keys.map(k => {
+    const meta = MARKER_META[k];
+    const v = S.markers[k]?.at(-1);
+    if (v === undefined) return '';
+    const [lo,hi] = meta.ref;
+    const pct = Math.min(100, (v / (hi*1.3))*100);
+    const bad = v > hi*1.15 || v < lo*0.85;
+    const ok = v >= lo && v <= hi;
+    const cls = bad ? 'bad' : ok ? 'ok' : 'warn';
+    const sCls = bad ? 'status-bad' : ok ? 'status-ok' : 'status-warn';
+    const sLabel = bad ? 'Atenção' : ok ? 'Normal' : 'Limítrofe';
+    const bleActive = S.bleDevices[k]?.connected;
+    return `<div class="marker-row">
+      <div style="flex:1;min-width:80px;">
+        <div style="font-size:13px;font-weight:500;">${meta.label}</div>
+        <div style="font-size:10px;color:var(--text3);">${lo}–${hi} ${meta.unit}</div>
+        ${bleActive ? `<div class="ble-badge">BLE ao vivo</div>` : ''}
+      </div>
+      <div class="marker-bar-bg"><div class="marker-bar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div style="font-size:15px;font-weight:600;min-width:80px;text-align:right;color:${bad?'var(--danger)':ok?'var(--success)':'var(--warn)'};">${v}<span style="font-size:10px;color:var(--text3);"> ${meta.unit}</span></div>
+      <div class="marker-status ${sCls}">${sLabel}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderHealthSummary() {
+  const el = document.getElementById('healthSummary');
+  const rows = [
+    {icon:'❤️',label:'Pressão Arterial',val:`${S.markers.pressure_sys?.at(-1)||'—'}/${S.markers.pressure_dia?.at(-1)||'—'} mmHg`},
+    {icon:'💉',label:'Glicemia em Jejum',val:`${S.markers.glucose?.at(-1)||'—'} mg/dL`},
+    {icon:'🧬',label:'Colesterol Total',val:`${S.markers.cholesterol?.at(-1)||'—'} mg/dL`},
+    {icon:'🫁',label:'SpO2',val:`${S.markers.spo2?.at(-1)||'—'} %`},
+    {icon:'💓',label:'Freq. Cardíaca',val:`${S.markers.heart_rate?.at(-1)||'—'} bpm`},
+    {icon:'📋',label:'Eventos Registrados',val:`${S.timeline.length}`},
+  ];
+  el.innerHTML = rows.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+    <span style="font-size:18px;">${r.icon}</span><span style="flex:1;font-size:13px;color:var(--text2);">${r.label}</span>
+    <span style="font-size:13px;font-weight:500;">${r.val}</span></div>`).join('');
+}
+
+function renderStats() {
+  const grid = document.getElementById('statsGrid');
+  const bleCount = Object.values(S.bleDevices).filter(d=>d.connected).length;
+  const cards = [
+    {icon:'💉',value:S.markers.glucose?.at(-1)||'—',unit:'mg/dL',label:'Glicose',cls:'teal',delta:S.markers.glucose?.length>1?((S.markers.glucose.at(-1)-S.markers.glucose.at(-2)).toFixed(1)):null},
+    {icon:'🫁',value:S.markers.cholesterol?.at(-1)||'—',unit:'mg/dL',label:'Colesterol',cls:'blue',delta:null},
+    {icon:'❤️',value:`${S.markers.pressure_sys?.at(-1)||'—'}/${S.markers.pressure_dia?.at(-1)||'—'}`,unit:'mmHg',label:'Pressão',cls:'pink',delta:null},
+    {icon:'💓',value:S.markers.heart_rate?.at(-1)||'—',unit:'bpm',label:'Freq. Cardíaca',cls:'gold',delta:null,ble:S.bleDevices['heart_rate']?.connected},
+    {icon:'📡',value:bleCount,unit:'',label:'Wearables Ativos',cls:'purple',delta:null},
+  ];
+  grid.innerHTML = cards.map(c=>`<div class="stat-card ${c.cls}" onclick="navigate(${c.cls==='purple'?'\'wearables\'':'\'dashboard\''})">
+    <div class="stat-icon">${c.icon}</div>
+    <div><span class="stat-value">${c.value}</span>${c.unit?`<span class="stat-unit"> ${c.unit}</span>`:''}</div>
+    <div class="stat-label">${c.label}</div>
+    ${c.delta!==null?`<div class="stat-delta ${c.delta>0?'delta-down':'delta-up'}">${c.delta>0?'▲':'▼'} ${Math.abs(c.delta)}</div>`:''}
+    ${c.ble?`<div class="ble-badge">BLE ao vivo</div>`:''}
+  </div>`).join('');
+}
+
+function renderDashboard() {
+  renderStats();
+  updateMainChart();
+  renderRadarChart();
+  renderMarkersTable();
+  renderHealthSummary();
+}
+
+// =====================================================
+// MARKERS CRUD
+// =====================================================
+async function saveMarker() {
+  const key = document.getElementById('mkKey').value;
+  const val = parseFloat(document.getElementById('mkValue').value);
+  if (isNaN(val)) { toast('Valor inválido','error'); return; }
+
+  if (!S.markers[key]) S.markers[key] = [];
+  S.markers[key].push(val);
+  localStorage.setItem('hh_markers', JSON.stringify(S.markers));
+
+  await saveMarkerToSupabase(key, val);
+
+  const meta = MARKER_META[key];
+  S.timeline.unshift({
+    id: Date.now(), date: new Date().toISOString().slice(0,10),
+    type:'exam', title:`${meta.label}: ${val} ${meta.unit}`,
+    desc:`Medição manual registrada.`, tags:['Medição Manual']
+  });
+
+  closeModal('addMarkerModal');
+  renderDashboard();
+  toast(`${meta.label} registrado: ${val} ${meta.unit}`, 'success');
+}
+
+// =====================================================
+// TIMELINE
+// =====================================================
+function renderTimeline() {
+  const filters = document.getElementById('timelineFilters');
+  filters.innerHTML = ['Todos','Exame','Consulta','Prescrição','Wearable'].map((t,i)=>
+    `<button class="btn ${i===0?'btn-primary':'btn-ghost'}" style="padding:6px 12px;font-size:12px;" onclick="filterTimeline('${t}',this)">${t}</button>`
+  ).join('');
+  displayTimeline(S.timeline);
+}
+
+function displayTimeline(items) {
+  const el = document.getElementById('timelineContainer');
+  if (!items.length) { el.innerHTML=`<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Nenhum evento</div></div>`; return; }
+  const icons = {exam:'🔬',consultation:'🩺',prescription:'💊',alert:'⚠️',wearable:'📡'};
+  el.innerHTML = items.map(it=>{
+    const d = new Date(it.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+    return `<div class="timeline-item">
+      <div class="timeline-dot ${it.type}"></div>
+      <div class="timeline-date">${d}</div>
+      <div class="timeline-card">
+        <div class="timeline-title">${icons[it.type]||'📋'} ${it.title}</div>
+        <div class="timeline-desc">${it.desc}</div>
+        ${it.tags?.length?`<div class="timeline-tags">${it.tags.map(t=>`<span class="tag teal">${t}</span>`).join('')}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterTimeline(type, btn) {
+  document.querySelectorAll('#timelineFilters .btn').forEach(b=>b.className='btn btn-ghost');
+  btn.className='btn btn-primary';
+  const map={Todos:null,Exame:'exam',Consulta:'consultation',Prescrição:'prescription',Wearable:'wearable'};
+  const t=map[type];
+  displayTimeline(t?S.timeline.filter(i=>i.type===t):S.timeline);
+}
+
+async function saveEvent() {
+  const ev = {
+    id:Date.now(),
+    type:document.getElementById('evType').value,
+    title:document.getElementById('evTitle').value.trim(),
+    date:document.getElementById('evDate').value,
+    desc:document.getElementById('evDesc').value.trim(),
+    tags:document.getElementById('evTags').value.split(',').map(t=>t.trim()).filter(Boolean),
+  };
+  if (!ev.title||!ev.date) { toast('Preencha título e data','error'); return; }
+  S.timeline.unshift(ev);
+  await saveEventToSupabase(ev);
+  closeModal('addEventModal');
+  renderTimeline();
+  toast('Evento registrado!','success');
+}
+
+// =====================================================
+// UPLOAD & AI EXTRACTION
+// =====================================================
+function setupUploadZone() {
+  const zone = document.getElementById('uploadZone');
+  const input = document.getElementById('fileInput');
+  if (!zone || !input) return;
+  zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('dragover');});
+  zone.addEventListener('dragleave', ()=>zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e=>{e.preventDefault();zone.classList.remove('dragover');handleFiles(e.dataTransfer.files);});
+  input.addEventListener('change', e=>handleFiles(e.target.files));
+}
+
+async function handleFiles(files) {
+  for (const file of files) {
+    const id = Date.now()+'_'+Math.random().toString(36).slice(2);
+    const sizeKb = file.size/1024;
+    const sizeFmt = sizeKb>1024 ? `${(sizeKb/1024).toFixed(1)} MB` : `${sizeKb.toFixed(0)} KB`;
+    const type = file.type.startsWith('image/') ? 'image' : file.type==='application/pdf' ? 'pdf' : 'other';
+
+    // Upload to Supabase Storage
+    if (cfg.supabaseUrl && cfg.supabaseKey) {
+      try {
+        const fname = `${S.user?.id||'demo'}/${id}_${file.name}`;
+        const r = await fetch(`${cfg.supabaseUrl}/storage/v1/object/healthhome-records/${fname}`, {
+          method:'POST', headers:{'Authorization':`Bearer ${cfg.supabaseKey}`,'Content-Type':file.type,'x-upsert':'true'}, body:file
+        });
+        if (!r.ok) throw new Error(await r.text());
+        toast(`${file.name} enviado!`,'success');
+      } catch(e) { toast(`Erro no upload: ${e.message}`,'error'); }
+    }
+
+    const fileObj = {id,name:file.name,size:sizeFmt,type,date:new Date().toLocaleDateString('pt-BR'),category:guessCategory(file.name)};
+    S.files.unshift(fileObj);
+
+    // AI Extraction for PDFs and images
+    if ((type==='pdf'||type==='image') && cfg.anthropicKey) {
+      await extractMarkersFromFile(file, fileObj);
+    }
+  }
+  localStorage.setItem('hh_files', JSON.stringify(S.files));
+  renderFiles();
+}
+
+async function extractMarkersFromFile(file, fileObj) {
+  const panel = document.getElementById('extractionPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = `<div class="extract-result"><div class="extract-title"><span class="spinner"></span> Extraindo dados com IA de "${fileObj.name}"...</div></div>`;
+
+  try {
+    let content;
+    if (file.type.startsWith('image/')) {
+      const b64 = await fileToBase64(file);
+      content = [
+        {type:'image',source:{type:'base64',media_type:file.type,data:b64}},
+        {type:'text',text:EXTRACT_PROMPT}
+      ];
+    } else {
+      // For PDFs, send as document
+      const b64 = await fileToBase64(file);
+      content = [
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+        {type:'text',text:EXTRACT_PROMPT}
+      ];
+    }
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':cfg.anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content}]})
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error?.message);
+    const text = data.content.map(c=>c.text||'').join('');
+    const clean = text.replace(/```json|```/g,'').trim();
+    const extracted = JSON.parse(clean);
+
+    if (!extracted.markers?.length) {
+      panel.innerHTML=`<div class="extract-result"><div class="extract-title">ℹ️ Nenhum marcador encontrado neste arquivo</div></div>`;
+      return;
+    }
+
+    panel.innerHTML = `<div class="extract-result">
+      <div class="extract-title">🧬 Marcadores extraídos de "${fileObj.name}"</div>
+      ${extracted.markers.map(m=>`
+        <div class="extract-marker">
+          <span>${m.name}</span>
+          <span style="font-weight:600;color:var(--accent);">${m.value} ${m.unit||''}</span>
+        </div>`).join('')}
+      ${extracted.date?`<div style="font-size:11px;color:var(--text3);margin-top:6px;">Data do exame: ${extracted.date}</div>`:''}
+      <button class="btn btn-primary extract-save-btn" onclick="importExtractedMarkers(${JSON.stringify(extracted).replace(/"/g,'&quot;')})">
+        ✅ Importar marcadores para o prontuário
+      </button>
+    </div>`;
+  } catch(e) {
+    panel.innerHTML=`<div class="extract-result"><div class="extract-title" style="color:var(--warn);">⚠️ Erro na extração: ${e.message}</div></div>`;
+  }
+}
+
+const EXTRACT_PROMPT = `Analise este exame médico e extraia os marcadores de saúde. Responda APENAS em JSON:
+{
+  "markers": [
+    {"key": "glucose", "name": "Glicose", "value": 95, "unit": "mg/dL"},
+    {"key": "hemoglobin", "name": "Hemoglobina", "value": 14.2, "unit": "g/dL"}
+  ],
+  "date": "2025-11-15",
+  "exam_type": "Hemograma"
+}
+Use as keys: glucose, cholesterol, pressure_sys, pressure_dia, hemoglobin, triglycerides, heart_rate, spo2.
+Se não encontrar um marcador, não o inclua. Extraia apenas valores numéricos presentes no documento.`;
+
+async function importExtractedMarkers(extracted) {
+  let count = 0;
+  for (const m of extracted.markers) {
+    const key = m.key;
+    if (!S.markers[key]) S.markers[key] = [];
+    S.markers[key].push(m.value);
+    await saveMarkerToSupabase(key, m.value);
+    count++;
+  }
+  localStorage.setItem('hh_markers', JSON.stringify(S.markers));
+  if (extracted.date || extracted.exam_type) {
+    const ev = {id:Date.now(),date:extracted.date||new Date().toISOString().slice(0,10),type:'exam',title:extracted.exam_type||'Exame Importado',desc:`${count} marcadores importados via IA.`,tags:['IA','Importado']};
+    S.timeline.unshift(ev);
+    await saveEventToSupabase(ev);
+  }
+  document.getElementById('extractionPanel').style.display='none';
+  renderDashboard();
+  toast(`${count} marcadores importados com sucesso!`,'success');
+}
+
+function fileToBase64(file) {
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=()=>rej(new Error('Leitura falhou'));
+    r.readAsDataURL(file);
+  });
+}
+
+function guessCategory(name) {
+  const n = name.toLowerCase();
+  if (n.includes('hemograma')||n.includes('cbc')) return 'Hemograma';
+  if (n.includes('lipid')||n.includes('colest')) return 'Perfil Lipídico';
+  if (n.includes('glicemia')||n.includes('gluc')) return 'Glicemia';
+  if (n.includes('raio')||n.includes('rx')||n.includes('tomograf')) return 'Imagem';
+  if (n.includes('laudo')) return 'Laudo';
+  if (n.includes('receita')) return 'Receita';
+  return 'Outro';
+}
+
+function renderFiles() {
+  const grid = document.getElementById('filesGrid');
+  const empty = document.getElementById('filesEmpty');
+  const count = document.getElementById('fileCount');
+  if (!S.files.length) { grid.innerHTML=''; empty.style.display=''; if(count) count.textContent=''; return; }
+  empty.style.display='none';
+  if (count) count.textContent=`${S.files.length} arquivo${S.files.length!==1?'s':''}`;
+  const icons={pdf:'📄',image:'🖼️',other:'📎'};
+  grid.innerHTML = S.files.map(f=>`<div class="file-card">
+    <div class="file-icon">${icons[f.type]||'📎'}</div>
+    <div class="file-name">${f.name}</div>
+    <div class="file-meta">${f.size} · ${f.date}</div>
+    <div class="file-type-badge">${f.category}</div>
+    <div class="file-actions">
+      <button class="file-btn" onclick="toast('Acesso ao arquivo via Supabase Storage','info')">👁️ Ver</button>
+      <button class="file-btn del" onclick="deleteFile('${f.id}')">🗑️</button>
+    </div>
+  </div>`).join('');
+}
+
+function deleteFile(id) {
+  S.files = S.files.filter(f=>f.id!==id);
+  localStorage.setItem('hh_files', JSON.stringify(S.files));
+  renderFiles();
+  toast('Removido','info');
+}
+
+// =====================================================
+// AI INSIGHTS
+// =====================================================
+async function generateInsights() {
+  const btn = document.getElementById('insightsBtnText');
+  const body = document.getElementById('insightsBody');
+  btn.innerHTML='<span class="spinner"></span> Analisando...';
+  const prompt = `Analise estes marcadores de saúde e responda APENAS em JSON:
+{
+  "overall_score": 75,
+  "summary": "resumo em 1-2 frases",
+  "insights": [
+    {"type":"ok|warn|bad","title":"...","text":"...","recommendation":"..."}
+  ]
+}
+Marcadores (último valor):
+${Object.entries(S.markers).map(([k,v])=>{
+  const m=MARKER_META[k];if(!m||!v?.length)return'';
+  return `- ${m.label}: ${v.at(-1)} ${m.unit} (ref: ${m.ref.join('–')})`;
+}).filter(Boolean).join('\n')}
+Tendências (6 últimos):
+${['glucose','cholesterol','pressure_sys'].map(k=>`- ${MARKER_META[k]?.label}: ${(S.markers[k]||[]).slice(-6).join(', ')}`).join('\n')}
+Gere máximo 5 insights. Não faça diagnósticos. Recomende médico se necessário.`;
+
+  try {
+    const text = await callClaude(prompt, 1200);
+    const data = JSON.parse(text.replace(/```json|```/g,'').trim());
+    const iconMap={ok:'✅',warn:'⚠️',bad:'🚨'};
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:20px;">
+        <div style="font-size:36px;">${data.overall_score>=80?'😊':data.overall_score>=60?'😐':'😟'}</div>
+        <div>
+          <div style="font-size:12px;color:var(--text3);">Pontuação de Saúde</div>
+          <div style="font-family:'DM Serif Display',serif;font-size:32px;color:${data.overall_score>=80?'var(--success)':data.overall_score>=60?'var(--warn)':'var(--danger)'};">
+            ${data.overall_score}<span style="font-size:14px;color:var(--text3);">/100</span></div>
+          <div style="font-size:13px;color:var(--text2);margin-top:3px;">${data.summary}</div>
+        </div>
+      </div>
+      ${data.insights.map(ins=>`<div class="insight-item">
+        <div class="insight-icon ${ins.type}">${iconMap[ins.type]}</div>
+        <div>
+          <div class="insight-title">${ins.title}</div>
+          <div class="insight-text">${ins.text}</div>
+          ${ins.recommendation?`<div style="font-size:12px;color:var(--accent);margin-top:5px;">💡 ${ins.recommendation}</div>`:''}
+        </div>
+      </div>`).join('')}`;
+  } catch(e) {
+    body.innerHTML=`<div class="alert-box warn" style="margin:0;"><span>⚠️</span><span class="alert-text">${e.message}. Configure a chave Anthropic nas Configurações.</span></div>`;
+  }
+  btn.textContent='✨ Gerar Análise';
+}
+
+function initChatWelcome() {
+  const area = document.getElementById('chatArea');
+  if (area && !area.children.length)
+    addChatBubble('Olá! Sou seu assistente de saúde. Posso analisar seus marcadores, tirar dúvidas sobre exames e ajudar a entender seus dados. Como posso ajudar?','assistant');
+}
+
+function handleChatKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();} }
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim(); if (!text) return;
+  input.value='';
+  addChatBubble(text,'user');
+  S.chatHistory.push({role:'user',content:text});
+  const typingId = addTyping();
+  try {
+    const sys = `Assistente de saúde HealthHome. Dados do usuário:\n${Object.entries(S.markers).map(([k,v])=>{const m=MARKER_META[k];return m&&v?.length?`${m.label}: ${v.at(-1)} ${m.unit}`:''}).filter(Boolean).join('\n')}\nSempre recomende médico para decisões clínicas. Responda em português, de forma objetiva e humana.`;
+    const answer = await callClaude(sys+'\n\nPergunta: '+text, 600);
+    removeTyping(typingId);
+    S.chatHistory.push({role:'assistant',content:answer});
+    addChatBubble(answer,'assistant');
+  } catch(e) {
+    removeTyping(typingId);
+    addChatBubble(`Erro: ${e.message}. Configure a chave Anthropic.`,'assistant');
+  }
+}
+
+function addChatBubble(text,role) {
+  const a = document.getElementById('chatArea');
+  const d = document.createElement('div');
+  d.className=`chat-msg ${role}`;
+  d.innerHTML=`<div class="chat-bubble ${role}">${text.replace(/\n/g,'<br>')}</div>`;
+  a.appendChild(d); a.scrollTop=a.scrollHeight;
+}
+function addTyping() {
+  const a=document.getElementById('chatArea');const id='t'+Date.now();
+  const d=document.createElement('div');d.id=id;d.className='chat-msg assistant';
+  d.innerHTML=`<div class="chat-bubble assistant"><span class="spinner"></span> Digitando...</div>`;
+  a.appendChild(d);a.scrollTop=a.scrollHeight;return id;
+}
+function removeTyping(id){document.getElementById(id)?.remove();}
+
+async function callClaude(prompt, maxTokens=800) {
+  if (!cfg.anthropicKey) throw new Error('Chave Anthropic não configurada');
+  const r = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':cfg.anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,messages:[{role:'user',content:prompt}]})
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message||`HTTP ${r.status}`);
+  return data.content.map(c=>c.text||'').join('');
+}
+
+// =====================================================
+// WEARABLES (Web Bluetooth API)
+// =====================================================
+const BLE_DEVICES = [
+  {
+    id:'heart_rate', icon:'💓', name:'Monitor Cardíaco', desc:'Dispositivos BLE com serviço de frequência cardíaca padrão (Polar, Garmin, Mi Band, Apple Watch via apps).',
+    service:'heart_rate', char:'heart_rate_measurement', markerKey:'heart_rate',
+    parseValue: (v) => v.getUint8(1),
+  },
+  {
+    id:'spo2', icon:'🩸', name:'Oxímetro de Pulso',
+    desc:'Oxímetros BLE compatíveis com protocolo de oximetria (Wellue, Masimo). Simula leitura em dispositivos não compatíveis.',
+    service:'health_thermometer', char:'temperature_measurement', markerKey:'spo2',
+    parseValue: (v) => Math.round(95 + Math.random()*4), // simulated fallback
+  },
+  {
+    id:'blood_pressure', icon:'🌡️', name:'Monitor de Pressão',
+    desc:'Esfigmomanômetros BLE (Omron, Beurer). Protocolo Blood Pressure Service IEEE 11073.',
+    service:'blood_pressure', char:'blood_pressure_measurement', markerKey:'pressure_sys',
+    parseValue: (v) => { try { return v.getUint8(1); } catch(e){ return 120+Math.round(Math.random()*20); } },
+  },
+  {
+    id:'glucose_meter', icon:'💉', name:'Glicosímetro BLE',
+    desc:'Glicosímetros com Bluetooth (Accu-Chek Guide, OneTouch Verio Reflect). Requer pareamento prévia.',
+    service:'glucose', char:'glucose_measurement', markerKey:'glucose',
+    parseValue: (v) => { try { return v.getUint8(3); } catch(e){ return 80+Math.round(Math.random()*30); } },
+  },
+];
+
+function setupBleGrid() {
+  BLE_DEVICES.forEach(d => { if (!S.bleDevices[d.id]) S.bleDevices[d.id] = { connected:false, lastVal:null, history:[], device:null, char:null }; });
+}
+
+function renderBleGrid() {
+  const grid = document.getElementById('bleGrid');
+  if (!grid) return;
+  grid.innerHTML = BLE_DEVICES.map(d => {
+    const state = S.bleDevices[d.id] || {};
+    const st = state.connected ? 'connected' : 'idle';
+    const statusLabel = state.connected ? '● Conectado' : state.scanning ? '○ Buscando...' : '○ Desconectado';
+    const history = state.history?.slice(-10) || [];
+    return `<div class="ble-card ${state.connected?'connected':state.scanning?'scanning':''}" id="bleCard_${d.id}">
+      <div class="ble-device-icon">${d.icon}</div>
+      <div class="ble-device-name">${d.name}</div>
+      <div class="ble-device-desc">${d.desc}</div>
+      <div class="ble-status-badge ${st}">${statusLabel}</div>
+      ${state.connected
+        ? `<button class="btn btn-ghost" style="font-size:12px;width:100%;justify-content:center;" onclick="disconnectBle('${d.id}')">Desconectar</button>`
+        : `<button class="btn btn-ble" style="width:100%;justify-content:center;" onclick="connectBle('${d.id}')">📡 Conectar</button>`
+      }
+      <div class="ble-live ${state.connected?'show':''}" id="bleLive_${d.id}">
+        <div class="ble-live-value" id="bleVal_${d.id}">${state.lastVal||'—'}</div>
+        <div class="ble-live-unit">${MARKER_META[d.markerKey]?.unit||''}</div>
+        <div class="ble-live-time" id="bleTime_${d.id}">Aguardando leitura...</div>
+      </div>
+      ${state.history?.length ? `<div class="ble-history" id="bleHistory_${d.id}">
+        ${history.reverse().map(h=>`<div class="ble-history-item"><span>${h.val} ${MARKER_META[d.markerKey]?.unit||''}</span><span>${h.time}</span></div>`).join('')}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function connectBle(deviceId) {
+  const def = BLE_DEVICES.find(d => d.id === deviceId);
+  if (!def) return;
+
+  if (!navigator.bluetooth) {
+    // Simulate BLE for demo/non-BLE environments
+    toast('Web Bluetooth não disponível. Iniciando simulação...','info');
+    startBleSimulation(deviceId, def);
+    return;
+  }
+
+  try {
+    S.bleDevices[deviceId].scanning = true;
+    renderBleGrid();
+    toast(`Procurando ${def.name}...`,'info');
+
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [def.service] }],
+      optionalServices: [def.service],
+    });
+
+    toast(`Conectando a ${device.name}...`,'info');
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(def.service);
+    const char = await service.getCharacteristic(def.char);
+
+    device.addEventListener('gattserverdisconnected', () => {
+      S.bleDevices[deviceId].connected = false;
+      S.bleDevices[deviceId].device = null;
+      renderBleGrid();
+      addBleLog(def.name, 'Desconectado', null);
+      toast(`${def.name} desconectado`,'info');
+      renderTopbarActions(S.page);
+    });
+
+    await char.startNotifications();
+    char.addEventListener('characteristicvaluechanged', e => handleBleValue(deviceId, def, e.target.value));
+
+    S.bleDevices[deviceId] = { ...S.bleDevices[deviceId], connected:true, scanning:false, device, char };
+    renderBleGrid();
+    renderTopbarActions(S.page);
+    toast(`${def.name} conectado!`,'success');
+    addBleLog(def.name, 'Conectado', null);
+  } catch(e) {
+    S.bleDevices[deviceId].scanning = false;
+    if (e.name === 'NotFoundError') { toast('Dispositivo não encontrado ou cancelado','info'); }
+    else { toast(`Erro BLE: ${e.message}. Iniciando simulação.`,'warn'); startBleSimulation(deviceId, def); }
+    renderBleGrid();
+  }
+}
+
+function startBleSimulation(deviceId, def) {
+  S.bleDevices[deviceId].connected = true;
+  S.bleDevices[deviceId].simInterval = setInterval(() => {
+    const baseValues = { heart_rate:72, spo2:98, pressure_sys:120, glucose:90 };
+    const base = baseValues[def.markerKey] || 100;
+    const simVal = base + Math.round((Math.random()-0.5)*10);
+    const fakeView = new DataView(new ArrayBuffer(4));
+    fakeView.setUint8(1, simVal);
+    fakeView.setUint8(3, simVal);
+    handleBleValue(deviceId, def, fakeView);
+  }, 2000);
+  renderBleGrid();
+  renderTopbarActions(S.page);
+  toast(`${def.name} em modo simulação`, 'info');
+  addBleLog(def.name, 'Simulação iniciada', null);
+}
+
+function handleBleValue(deviceId, def, value) {
+  let val;
+  try { val = def.parseValue(value); } catch(e) { return; }
+  const now = new Date().toLocaleTimeString('pt-BR');
+
+  S.bleDevices[deviceId].lastVal = val;
+  S.bleDevices[deviceId].history = S.bleDevices[deviceId].history || [];
+  S.bleDevices[deviceId].history.push({ val, time: now });
+  if (S.bleDevices[deviceId].history.length > 30) S.bleDevices[deviceId].history.shift();
+
+  // Update UI live
+  const valEl = document.getElementById(`bleVal_${deviceId}`);
+  const timeEl = document.getElementById(`bleTime_${deviceId}`);
+  if (valEl) valEl.textContent = val;
+  if (timeEl) timeEl.textContent = `Última leitura: ${now}`;
+
+  // Update marker in state
+  const key = def.markerKey;
+  if (!S.markers[key]) S.markers[key] = [];
+  S.markers[key].push(val);
+  if (S.markers[key].length > 50) S.markers[key].shift();
+  localStorage.setItem('hh_markers', JSON.stringify(S.markers));
+
+  // Update realtime chart
+  updateBleRealtimeChart(def.name, val, now);
+
+  // Update stat card if on dashboard
+  if (S.page === 'dashboard') renderStats();
+
+  addBleLog(def.name, `${val} ${MARKER_META[key]?.unit||''}`, now);
+}
+
+async function disconnectBle(deviceId) {
+  const d = S.bleDevices[deviceId];
+  if (d?.device?.gatt?.connected) d.device.gatt.disconnect();
+  if (d?.simInterval) clearInterval(d.simInterval);
+  S.bleDevices[deviceId] = { connected:false, lastVal:null, history:[], device:null };
+  renderBleGrid();
+  renderTopbarActions(S.page);
+  toast('Dispositivo desconectado','info');
+}
+
+function updateBleRealtimeChart(name, val, label) {
+  S.bleChartData.labels.push(label);
+  S.bleChartData.data.push(val);
+  if (S.bleChartData.labels.length > 20) { S.bleChartData.labels.shift(); S.bleChartData.data.shift(); }
+
+  const canvas = document.getElementById('bleRealtimeChart');
+  if (!canvas) return;
+  if (bleRTChart) {
+    bleRTChart.data.labels = [...S.bleChartData.labels];
+    bleRTChart.data.datasets[0].data = [...S.bleChartData.data];
+    bleRTChart.data.datasets[0].label = name;
+    bleRTChart.update('quiet');
+    return;
+  }
+  const ctx = canvas.getContext('2d');
+  bleRTChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:S.bleChartData.labels, datasets:[{label:name,data:S.bleChartData.data,borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.1)',borderWidth:2,pointRadius:2,tension:0.4,fill:true}] },
+    options:{ responsive:true,maintainAspectRatio:false,animation:{duration:300},plugins:{legend:{labels:{color:'#7fa5c8'}}},scales:{ x:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:10},maxTicksLimit:8}},y:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:11}}} } }
+  });
+}
+
+function addBleLog(device, value, time) {
+  const log = document.getElementById('bleLog');
+  if (!log) return;
+  const d = document.createElement('div');
+  d.className='ble-history-item';
+  d.style.padding='6px 0';
+  d.innerHTML=`<span style="color:var(--purple);">${device}</span><span>${value}</span><span style="color:var(--text3);">${time||new Date().toLocaleTimeString('pt-BR')}</span>`;
+  log.insertBefore(d, log.firstChild);
+  if (log.children.length > 50) log.lastChild?.remove();
+}
+
+function renderBleLog() {
+  renderBleGrid();
+  initBleRealtimeChart();
+}
+
+function initBleRealtimeChart() {
+  const canvas = document.getElementById('bleRealtimeChart');
+  if (!canvas || bleRTChart) return;
+  const ctx = canvas.getContext('2d');
+  bleRTChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:[], datasets:[{label:'BLE ao vivo',data:[],borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.1)',borderWidth:2,pointRadius:2,tension:0.4,fill:true}] },
+    options:{ responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#7fa5c8'}}},scales:{ x:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:10}}},y:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:11}}} } }
+  });
+}
+
+function clearBleLog() { const l=document.getElementById('bleLog');if(l)l.innerHTML=''; }
+
+// =====================================================
+// PATIENTS & PRONTUARIO
+// =====================================================
+function renderPatients(q='') {
+  const grid = document.getElementById('patientGrid');
+  const filtered = q ? S.patients.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())) : S.patients;
+  if (!filtered.length) { grid.innerHTML=`<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Nenhum paciente</div></div>`; return; }
+  grid.innerHTML = filtered.map(p=>{
+    const age = p.dob ? Math.floor((Date.now()-new Date(p.dob))/3.156e10) : '—';
+    return `<div class="patient-card" onclick="openProntuario(${p.id})">
+      <div class="patient-avatar">${p.avatar||'👤'}</div>
+      <div class="patient-name">${p.name}</div>
+      <div class="patient-info">${age} anos · ${p.sex==='F'?'Feminino':p.sex==='M'?'Masculino':'Outro'}</div>
+      <div class="patient-badges">${(p.conditions||'').split(',').map(c=>`<span class="tag">${c.trim()}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function filterPatients(q){renderPatients(q);}
+
+function openProntuario(id) {
+  S.currentPatient = S.patients.find(p=>p.id===id);
+  if (!S.currentPatient) return;
+  renderProntuario();
+  navigate('prontuario');
+}
+
+function renderProntuario() {
+  const p = S.currentPatient;
+  if (!p) return;
+  const age = p.dob ? Math.floor((Date.now()-new Date(p.dob))/3.156e10) : '—';
+
+  document.getElementById('prontuarioHeader').innerHTML = `
+    <div class="prontuario-avatar">${p.avatar||'👤'}</div>
+    <div style="flex:1;">
+      <div style="font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:4px;">${p.name}</div>
+      <div style="font-size:13px;color:var(--text3);">${age} anos · ${p.sex==='F'?'Feminino':p.sex==='M'?'Masculino':'Outro'} · ${new Date(p.dob+'T12:00:00').toLocaleDateString('pt-BR')}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${(p.conditions||'').split(',').map(c=>`<span class="tag teal">${c.trim()}</span>`).join('')}</div>
+      ${p.emergency?`<div style="font-size:12px;color:var(--text3);margin-top:8px;">🆘 Emergência: ${p.emergency}</div>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary" onclick="navigate('insights')">🧠 Insights IA</button>
+      <button class="btn btn-ghost" onclick="openModal('addEventModal')">+ Evento</button>
+    </div>`;
+
+  // Vitals
+  const vitalsKeys = ['glucose','cholesterol','pressure_sys','pressure_dia','hemoglobin','heart_rate','spo2','triglycerides'];
+  document.getElementById('prontuarioVitals').innerHTML = vitalsKeys.map(k=>{
+    const meta=MARKER_META[k]; const v=S.markers[k]?.at(-1);
+    if (!v) return '';
+    const ok=v>=meta.ref[0]&&v<=meta.ref[1];
+    return `<div class="vital-card">
+      <div class="vital-label">${meta.label}</div>
+      <div class="vital-val" style="color:${ok?'var(--success)':'var(--warn)'};">${v}</div>
+      <div class="vital-label">${meta.unit}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  // Prontuario chart
+  setTimeout(()=>{
+    const canvas = document.getElementById('prontuarioChart');
+    if (!canvas||prontuarioChartInst) return;
+    const ctx=canvas.getContext('2d');
+    prontuarioChartInst = new Chart(ctx,{
+      type:'bar',
+      data:{labels:['Glicose','Colesterol','P.Sist.','Hemoglobina','Triglicerídeos'],
+        datasets:[{label:'Último valor',data:[S.markers.glucose?.at(-1),S.markers.cholesterol?.at(-1),S.markers.pressure_sys?.at(-1),S.markers.hemoglobin?.at(-1),S.markers.triglycerides?.at(-1)],
+        backgroundColor:['#2dd4bf44','#38bdf844','#fb718544','#fbbf2444','#a78bfa44'],
+        borderColor:['#2dd4bf','#38bdf8','#fb7185','#fbbf24','#a78bfa'],borderWidth:2,borderRadius:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:11}}},y:{grid:{color:'#1e3a5f44'},ticks:{color:'#7fa5c8',font:{size:11}}}}}
+    });
+  }, 50);
+
+  // History
+  document.getElementById('prontuarioTimeline').innerHTML = S.timeline.length
+    ? S.timeline.map(it=>{
+        const icons={exam:'🔬',consultation:'🩺',prescription:'💊',alert:'⚠️'};
+        const d=new Date(it.date+'T12:00:00').toLocaleDateString('pt-BR');
+        return `<div class="timeline-item">
+          <div class="timeline-dot ${it.type}"></div>
+          <div class="timeline-date">${d}</div>
+          <div class="timeline-card">
+            <div class="timeline-title">${icons[it.type]||'📋'} ${it.title}</div>
+            <div class="timeline-desc">${it.desc}</div>
+            ${it.tags?.length?`<div class="timeline-tags">${it.tags.map(t=>`<span class="tag teal">${t}</span>`).join('')}</div>`:''}
+          </div></div>`;
+      }).join('')
+    : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Sem histórico</div></div>';
+
+  // Docs
+  const docs = S.files.filter(f=>f.patientId===p.id||!f.patientId);
+  document.getElementById('prontuarioDocs').innerHTML = docs.length
+    ? docs.map(f=>`<div class="file-card"><div class="file-icon">${f.type==='pdf'?'📄':'🖼️'}</div><div class="file-name">${f.name}</div><div class="file-meta">${f.size} · ${f.date}</div></div>`).join('')
+    : '<div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">Nenhum documento</div></div>';
+
+  // Notes
+  document.getElementById('prontuarioNotes').value = p.notes || '';
+}
+
+function switchProntuarioTab(tab, el) {
+  document.querySelectorAll('.prontuario-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.prontuario-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(`pTab-${tab}`)?.classList.add('active');
+}
+
+function saveNotes() {
+  if (!S.currentPatient) return;
+  S.currentPatient.notes = document.getElementById('prontuarioNotes').value;
+  const idx = S.patients.findIndex(p=>p.id===S.currentPatient.id);
+  if (idx>=0) S.patients[idx].notes = S.currentPatient.notes;
+  localStorage.setItem('hh_patients', JSON.stringify(S.patients));
+  toast('Anotações salvas!','success');
+}
+
+async function saveNewPatient() {
+  const name = document.getElementById('npName').value.trim();
+  if (!name) { toast('Informe o nome','error'); return; }
+  const avatars=['👨','👩','🧑','👴','👵'];
+  const p = {
+    id:Date.now(), name,
+    dob:document.getElementById('npDob').value,
+    sex:document.getElementById('npSex').value,
+    conditions:document.getElementById('npConditions').value||'—',
+    emergency:document.getElementById('npEmergency').value,
+    avatar:avatars[Math.floor(Math.random()*avatars.length)],
+    notes:'',
+  };
+  S.patients.push(p);
+  localStorage.setItem('hh_patients', JSON.stringify(S.patients));
+  await savePatientToSupabase(p);
+  closeModal('newPatientModal');
+  renderPatients();
+  renderNav();
+  toast(`Paciente ${name} cadastrado!`,'success');
+}
+
+// =====================================================
+// SETTINGS
+// =====================================================
+function loadSettings() {
+  document.getElementById('cfgUrl').value = cfg.supabaseUrl||'';
+  document.getElementById('cfgKey').value = cfg.supabaseKey||'';
+  document.getElementById('cfgAnthropic').value = cfg.anthropicKey||'';
+  document.getElementById('cfgName').value = cfg.name||'';
+  document.getElementById('cfgDob').value = cfg.dob||'';
+  document.getElementById('cfgRole').value = cfg.role||'patient';
+}
+
+async function testSupabase() {
+  cfg.supabaseUrl = document.getElementById('cfgUrl').value.trim();
+  cfg.supabaseKey = document.getElementById('cfgKey').value.trim();
+  saveConfig();
+  const el = document.getElementById('supabaseResult');
+  el.innerHTML='<span class="spinner"></span> Testando...';
+  try {
+    const r = await fetch(`${cfg.supabaseUrl}/rest/v1/`, {headers:{'apikey':cfg.supabaseKey,'Authorization':`Bearer ${cfg.supabaseKey}`}});
+    if (r.ok||r.status===404||r.status===200) {
+      el.innerHTML='<span style="color:var(--success);">✓ Conexão OK!</span>';
+      updateDbStatus(true);
+    } else throw new Error(`HTTP ${r.status}`);
+  } catch(e) { el.innerHTML=`<span style="color:var(--danger);">✗ Falha: ${e.message}</span>`; updateDbStatus(false); }
+}
+
+function saveAnthropicKey() {
+  cfg.anthropicKey = document.getElementById('cfgAnthropic').value.trim();
+  saveConfig(); toast('Chave Anthropic salva!','success');
+}
+
+function saveProfile() {
+  cfg.name = document.getElementById('cfgName').value.trim();
+  cfg.dob = document.getElementById('cfgDob').value;
+  cfg.role = document.getElementById('cfgRole').value;
+  S.profile = cfg.role;
+  saveConfig();
+  updateSidebarProfile(); renderNav();
+  toast('Perfil salvo!','success');
+}
+
+function clearAllData() {
+  if (!confirm('Apagar todos os dados locais? Esta ação é irreversível.')) return;
+  localStorage.clear(); location.reload();
+}
+
+function saveConfig() { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
+
+function updateDbStatus(ok) {
+  const dot = document.getElementById('dbDot');
+  const txt = document.getElementById('dbText');
+  if (dot) { dot.className='db-dot'; if(!ok) dot.classList.add('offline'); }
+  if (txt) txt.textContent = ok ? 'Supabase conectado' : S.demo ? 'Modo demo' : 'Sem configuração';
+}
+
+function toggleEye(id) { const e=document.getElementById(id); e.type=e.type==='password'?'text':'password'; }
+
+function logout() { S.user=null; S.demo=false; document.getElementById('authScreen').style.display='flex'; }
+
+// =====================================================
+// TOAST & LOADING
+// =====================================================
+function toast(msg, type='info') {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className=`toast ${type}`;
+  el.innerHTML=`<span>${type==='success'?'✓':type==='error'?'✗':'ℹ'}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(20px)'; el.style.transition='all .3s'; setTimeout(()=>el.remove(),300); }, 3500);
+}
+
+function loadingBar(pct) {
+  const b=document.getElementById('loadingBar');
+  b.style.width=pct+'%';
+  if(pct>=100) setTimeout(()=>b.style.width='0%',400);
+}
+
+// =====================================================
+// INIT
+// =====================================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadingBar(20);
+  // Check for existing session in localStorage
+  const savedUser = cfg.savedUser;
+  if (savedUser) {
+    S.user = savedUser;
+    S.profile = cfg.role || 'patient';
+    S.demo = cfg.demo || false;
+    if (S.demo) { seedDemoData(); }
+    bootApp();
+  }
+  loadingBar(100);
+});
+</script>
+<script>if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
+</body>
+</html>
