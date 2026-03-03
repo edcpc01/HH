@@ -1980,8 +1980,21 @@ function loadingBar(pct) {
 // =====================================================
 // INIT
 // =====================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   loadingBar(20);
+
+  // Load env vars from Vercel FIRST before checking auth
+  try {
+    const envResp = await fetch('/api/env');
+    if (envResp.ok) {
+      const env = await envResp.json();
+      if (env.GEMINI_KEY) { cfg.geminiKey = env.GEMINI_KEY; }
+      if (env.SUPABASE_URL) { cfg.supabaseUrl = env.SUPABASE_URL; }
+      if (env.SUPABASE_KEY) { cfg.supabaseKey = env.SUPABASE_KEY; }
+      saveConfig();
+    }
+  } catch(e) { /* fallback to manual config */ }
+
   // Check for existing session in localStorage
   const savedUser = cfg.savedUser;
   if (savedUser) {
