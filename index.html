@@ -605,10 +605,10 @@ nav{flex:1;padding:16px 12px;overflow-y:auto;}
             </div>
           </div>
           <div class="card">
-            <div class="card-header"><div class="card-title">🧠 Anthropic Claude</div></div>
+            <div class="card-header"><div class="card-title">🤖 Google Gemini (IA)</div></div>
             <div style="display:flex;flex-direction:column;gap:12px;">
-              <div class="form-group"><label class="form-label">API Key</label><div class="api-key-row"><input class="form-input" id="cfgAnthropic" type="password" placeholder="sk-ant-..."/><button class="eye-btn" onclick="toggleEye('cfgAnthropic')">👁️</button></div><span class="form-hint">console.anthropic.com</span></div>
-              <button class="btn btn-primary" onclick="saveAnthropicKey()">Salvar Chave</button>
+              <div class="form-group"><label class="form-label">API Key</label><div class="api-key-row"><input class="form-input" id="cfgAnthropic" type="password" placeholder="AIza..."/><button class="eye-btn" onclick="toggleEye('cfgAnthropic')">👁️</button></div><span class="form-hint">aistudio.google.com/app/apikey — gratuito</span></div>
+              <button class="btn btn-primary" onclick="saveGeminiKey()">Salvar Chave</button>
             </div>
           </div>
           <div class="card">
@@ -1230,15 +1230,17 @@ async function handleFiles(files) {
     const localUrl = URL.createObjectURL(file);
     S.blobUrls = S.blobUrls || {};
     S.blobUrls[id] = localUrl;
-    const fileObj = {id, name:file.name, size:sizeFmt, type, date:new Date().toLocaleDateString('pt-BR'), category:guessCategory(file.name), localUrl, localBlob: file, extracted: false};
+    const userId = S.user?.id || 'shared';
+    const storagePath = `${userId}/${id}_${file.name}`;
+    const fileObj = {id, name:file.name, size:sizeFmt, type, date:new Date().toLocaleDateString('pt-BR'), category:guessCategory(file.name), localUrl, localBlob: file, extracted: false, storagePath};
     S.files.unshift(fileObj);
     renderFiles();
 
     // AI Extraction — always try if key exists
-    if ((type==='pdf'||type==='image') && cfg.anthropicKey) {
+    if ((type==='pdf'||type==='image') && cfg.geminiKey) {
       await extractMarkersFromFile(file, fileObj);
-    } else if ((type==='pdf'||type==='image') && !cfg.anthropicKey) {
-      toast('Configure a chave Anthropic em Configurações para extração automática de marcadores', 'info');
+    } else if ((type==='pdf'||type==='image') && !cfg.geminiKey) {
+      toast('Configure a chave Gemini em Configurações para extração automática (gratuito em aistudio.google.com)', 'info');
     }
   }
   // Save without blob/localUrl (not serializable)
@@ -1253,30 +1255,35 @@ async function extractMarkersFromFile(file, fileObj) {
   panel.innerHTML = `<div class="extract-result"><div class="extract-title"><span class="spinner"></span> Extraindo dados com IA de "${fileObj.name}"...</div></div>`;
 
   try {
-    let content;
-    if (file.type.startsWith('image/')) {
-      const b64 = await fileToBase64(file);
-      content = [
-        {type:'image',source:{type:'base64',media_type:file.type,data:b64}},
-        {type:'text',text:EXTRACT_PROMPT}
-      ];
-    } else {
-      // For PDFs, send as document
-      const b64 = await fileToBase64(file);
-      content = [
-        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
-        {type:'text',text:EXTRACT_PROMPT}
-      ];
-    }
+    // file content is handled inline below for Gemini
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':cfg.anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content}]})
+    // Use Gemini with file content
+    const model = 'gemini-2.0-flash';
+    const gemUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
+    
+    // Build Gemini parts: inline_data + text prompt
+    const parts = [];
+    if (file.type.startsWith('image/')) {
+      const b64img = await fileToBase64(file);
+      parts.push({ inline_data: { mime_type: file.type, data: b64img } });
+    } else {
+      // PDF: send as base64 inline_data
+      const b64pdf = await fileToBase64(file);
+      parts.push({ inline_data: { mime_type: 'application/pdf', data: b64pdf } });
+    }
+    parts.push({ text: EXTRACT_PROMPT });
+
+    const resp = await fetch(gemUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { maxOutputTokens: 1000, temperature: 0.1 }
+      })
     });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error?.message);
-    const text = data.content.map(c=>c.text||'').join('');
+    if (!resp.ok) throw new Error(data.error?.message || 'Erro Gemini');
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const clean = text.replace(/```json|```/g,'').trim();
     const extracted = JSON.parse(clean);
 
@@ -1402,8 +1409,7 @@ async function viewFile(id) {
     try {
       const token = cfg.supabaseToken || cfg.supabaseKey;
       const userId = S.user?.id || S.savedUserId || 'shared';
-      // path must NOT be encoded in the URL itself, just the path segments
-      const storagePath = `${userId}/${f.id}_${f.name}`;
+      const storagePath = f.storagePath || `${userId}/${f.id}_${f.name}`;
       const r = await fetch(`${cfg.supabaseUrl}/storage/v1/object/sign/healthhome-records/${storagePath}`, {
         method: 'POST',
         headers: {
@@ -1431,7 +1437,7 @@ async function viewFile(id) {
   if (cfg.supabaseUrl && cfg.supabaseKey) {
     const token = cfg.supabaseToken || cfg.supabaseKey;
     const userId = S.user?.id || S.savedUserId || 'shared';
-    const storagePath = `${userId}/${f.id}_${f.name}`;
+    const storagePath = f.storagePath || `${userId}/${f.id}_${f.name}`;
     // Try direct download (works if bucket is public or with auth header via redirect)
     const downloadUrl = `${cfg.supabaseUrl}/storage/v1/object/authenticated/healthhome-records/${storagePath}`;
     // Open with token in URL as query param
@@ -1457,7 +1463,7 @@ async function viewFile(id) {
 async function reExtractFile(id) {
   const f = S.files.find(x=>x.id===id);
   if (!f) return;
-  if (!cfg.anthropicKey) { toast('Configure a chave Anthropic para extração com IA', 'warn'); navigate('settings'); return; }
+  if (!cfg.geminiKey) { toast('Configure a chave Gemini para extração com IA', 'warn'); navigate('settings'); return; }
   if (!f.localBlob) { toast('Arquivo não disponível localmente. Faça um novo upload para extração automática.', 'info'); return; }
   await extractMarkersFromFile(f.localBlob, f);
 }
@@ -1516,7 +1522,7 @@ Gere máximo 5 insights. Não faça diagnósticos. Recomende médico se necessá
         </div>
       </div>`).join('')}`;
   } catch(e) {
-    body.innerHTML=`<div class="alert-box warn" style="margin:0;"><span>⚠️</span><span class="alert-text">${e.message}. Configure a chave Anthropic nas Configurações.</span></div>`;
+    body.innerHTML=`<div class="alert-box warn" style="margin:0;"><span>⚠️</span><span class="alert-text">${e.message}. Configure a chave Gemini nas Configurações.</span></div>`;
   }
   btn.textContent='✨ Gerar Análise';
 }
@@ -1544,7 +1550,7 @@ async function sendChat() {
     addChatBubble(answer,'assistant');
   } catch(e) {
     removeTyping(typingId);
-    addChatBubble(`Erro: ${e.message}. Configure a chave Anthropic.`,'assistant');
+    addChatBubble(`Erro: ${e.message}. Configure a chave Gemini.`,'assistant');
   }
 }
 
@@ -1564,78 +1570,26 @@ function addTyping() {
 function removeTyping(id){document.getElementById(id)?.remove();}
 
 async function callClaude(prompt, maxTokens=800) {
-  if (!cfg.anthropicKey) throw new Error('Chave Anthropic não configurada');
-  const r = await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':cfg.anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,messages:[{role:'user',content:prompt}]})
+  return callGemini(prompt, maxTokens);
+}
+
+async function callGemini(prompt, maxTokens=800) {
+  if (!cfg.geminiKey) throw new Error('Chave Gemini não configurada. Vá em Configurações e adicione sua API Key do Google Gemini (gratuito em aistudio.google.com).');
+  const model = 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 }
+    })
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error?.message||`HTTP ${r.status}`);
-  return data.content.map(c=>c.text||'').join('');
+  if (!r.ok) throw new Error(data.error?.message || 'Erro Gemini API');
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
-// =====================================================
-// WEARABLES (Web Bluetooth API)
-// =====================================================
-const BLE_DEVICES = [
-  {
-    id:'heart_rate', icon:'💓', name:'Monitor Cardíaco', desc:'Dispositivos BLE com serviço de frequência cardíaca padrão (Polar, Garmin, Mi Band, Apple Watch via apps).',
-    service:'heart_rate', char:'heart_rate_measurement', markerKey:'heart_rate',
-    parseValue: (v) => v.getUint8(1),
-  },
-  {
-    id:'spo2', icon:'🩸', name:'Oxímetro de Pulso',
-    desc:'Oxímetros BLE compatíveis com protocolo de oximetria (Wellue, Masimo). Simula leitura em dispositivos não compatíveis.',
-    service:'health_thermometer', char:'temperature_measurement', markerKey:'spo2',
-    parseValue: (v) => Math.round(95 + Math.random()*4), // simulated fallback
-  },
-  {
-    id:'blood_pressure', icon:'🌡️', name:'Monitor de Pressão',
-    desc:'Esfigmomanômetros BLE (Omron, Beurer). Protocolo Blood Pressure Service IEEE 11073.',
-    service:'blood_pressure', char:'blood_pressure_measurement', markerKey:'pressure_sys',
-    parseValue: (v) => { try { return v.getUint8(1); } catch(e){ return 120+Math.round(Math.random()*20); } },
-  },
-  {
-    id:'glucose_meter', icon:'💉', name:'Glicosímetro BLE',
-    desc:'Glicosímetros com Bluetooth (Accu-Chek Guide, OneTouch Verio Reflect). Requer pareamento prévia.',
-    service:'glucose', char:'glucose_measurement', markerKey:'glucose',
-    parseValue: (v) => { try { return v.getUint8(3); } catch(e){ return 80+Math.round(Math.random()*30); } },
-  },
-];
-
-function setupBleGrid() {
-  BLE_DEVICES.forEach(d => { if (!S.bleDevices[d.id]) S.bleDevices[d.id] = { connected:false, lastVal:null, history:[], device:null, char:null }; });
-}
-
-function renderBleGrid() {
-  const grid = document.getElementById('bleGrid');
-  if (!grid) return;
-  grid.innerHTML = BLE_DEVICES.map(d => {
-    const state = S.bleDevices[d.id] || {};
-    const st = state.connected ? 'connected' : 'idle';
-    const statusLabel = state.connected ? '● Conectado' : state.scanning ? '○ Buscando...' : '○ Desconectado';
-    const history = state.history?.slice(-10) || [];
-    return `<div class="ble-card ${state.connected?'connected':state.scanning?'scanning':''}" id="bleCard_${d.id}">
-      <div class="ble-device-icon">${d.icon}</div>
-      <div class="ble-device-name">${d.name}</div>
-      <div class="ble-device-desc">${d.desc}</div>
-      <div class="ble-status-badge ${st}">${statusLabel}</div>
-      ${state.connected
-        ? `<button class="btn btn-ghost" style="font-size:12px;width:100%;justify-content:center;" onclick="disconnectBle('${d.id}')">Desconectar</button>`
-        : `<button class="btn btn-ble" style="width:100%;justify-content:center;" onclick="connectBle('${d.id}')">📡 Conectar</button>`
-      }
-      <div class="ble-live ${state.connected?'show':''}" id="bleLive_${d.id}">
-        <div class="ble-live-value" id="bleVal_${d.id}">${state.lastVal||'—'}</div>
-        <div class="ble-live-unit">${MARKER_META[d.markerKey]?.unit||''}</div>
-        <div class="ble-live-time" id="bleTime_${d.id}">Aguardando leitura...</div>
-      </div>
-      ${state.history?.length ? `<div class="ble-history" id="bleHistory_${d.id}">
-        ${history.reverse().map(h=>`<div class="ble-history-item"><span>${h.val} ${MARKER_META[d.markerKey]?.unit||''}</span><span>${h.time}</span></div>`).join('')}
-      </div>` : ''}
-    </div>`;
-  }).join('');
-}
 
 async function connectBle(deviceId) {
   const def = BLE_DEVICES.find(d => d.id === deviceId);
@@ -1941,7 +1895,7 @@ async function saveNewPatient() {
 function loadSettings() {
   document.getElementById('cfgUrl').value = cfg.supabaseUrl||'';
   document.getElementById('cfgKey').value = cfg.supabaseKey||'';
-  document.getElementById('cfgAnthropic').value = cfg.anthropicKey||'';
+  document.getElementById('cfgAnthropic').value = cfg.geminiKey||'';
   document.getElementById('cfgName').value = cfg.name||'';
   document.getElementById('cfgDob').value = cfg.dob||'';
   document.getElementById('cfgRole').value = cfg.role||'patient';
@@ -1962,9 +1916,9 @@ async function testSupabase() {
   } catch(e) { el.innerHTML=`<span style="color:var(--danger);">✗ Falha: ${e.message}</span>`; updateDbStatus(false); }
 }
 
-function saveAnthropicKey() {
-  cfg.anthropicKey = document.getElementById('cfgAnthropic').value.trim();
-  saveConfig(); toast('Chave Anthropic salva!','success');
+function saveGeminiKey() {
+  cfg.geminiKey = document.getElementById('cfgAnthropic').value.trim();
+  saveConfig(); toast('Chave Gemini salva!','success');
 }
 
 function saveProfile() {
