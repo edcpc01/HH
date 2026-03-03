@@ -1268,7 +1268,7 @@ async function extractMarkersFromFile(file, fileObj) {
     // file content is handled inline below for Gemini
 
     // Use Gemini with file content
-    const model = 'gemini-1.5-flash';
+    const model = await getGeminiModel();
     const gemUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
     
     // Build Gemini parts: inline_data + text prompt
@@ -1585,18 +1585,25 @@ async function callClaude(prompt, maxTokens=800) {
   return callGemini(prompt, maxTokens);
 }
 
+async function getGeminiModel() {
+  if (cfg.geminiModel) return cfg.geminiModel;
+  const models = ['gemini-2.0-flash','gemini-1.5-flash','gemini-1.5-pro','gemini-pro','gemini-1.0-pro'];
+  for (const m of models) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${cfg.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:5}})});
+      const d = await r.json();
+      if (!d.error?.message?.includes('not found') && !d.error?.message?.includes('not supported')) {
+        cfg.geminiModel = m; saveConfig(); console.log('Using model:', m); return m;
+      }
+    } catch(e) {}
+  }
+  throw new Error('Nenhum modelo Gemini disponível. Verifique sua chave.');
+}
+
 async function callGemini(prompt, maxTokens=800) {
-  if (!cfg.geminiKey) throw new Error('Chave Gemini não configurada. Vá em Configurações e adicione sua API Key do Google Gemini (gratuito em aistudio.google.com).');
-  const model = 'gemini-1.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 }
-    })
-  });
+  if (!cfg.geminiKey) throw new Error('Chave Gemini não configurada. Vá em Configurações.');
+  const model = await getGeminiModel();
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:maxTokens,temperature:0.3}})});
   const data = await r.json();
   if (!r.ok) throw new Error(data.error?.message || 'Erro Gemini API');
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
