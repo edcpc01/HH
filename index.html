@@ -829,6 +829,17 @@ function enterDemoMode() {
 }
 
 async function bootApp() {
+  // Load keys from Vercel environment variables via /api/env
+  try {
+    const envResp = await fetch('/api/env');
+    if (envResp.ok) {
+      const env = await envResp.json();
+      if (env.GEMINI_KEY && !cfg.geminiKey) { cfg.geminiKey = env.GEMINI_KEY; }
+      if (env.SUPABASE_URL && !cfg.supabaseUrl) { cfg.supabaseUrl = env.SUPABASE_URL; }
+      if (env.SUPABASE_KEY && !cfg.supabaseKey) { cfg.supabaseKey = env.SUPABASE_KEY; }
+      saveConfig();
+    }
+  } catch(e) { /* no env endpoint, use manual config */ }
   loadingBar(40);
   document.getElementById('authScreen').style.display = 'none';
 
@@ -841,7 +852,6 @@ async function bootApp() {
   renderNav();
   setupUploadZone();
   renderDashboard();
-  setupBleGrid();
   initChatWelcome();
   updateDbStatus(!S.demo && !!cfg.supabaseUrl);
   loadingBar(100);
