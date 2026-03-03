@@ -1226,8 +1226,10 @@ async function handleFiles(files) {
       toast(`${file.name} salvo localmente (modo demo)`, 'info');
     }
 
-    // Store local object URL for preview
+    // Store local object URL for preview (persists in memory map)
     const localUrl = URL.createObjectURL(file);
+    S.blobUrls = S.blobUrls || {};
+    S.blobUrls[id] = localUrl;
     const fileObj = {id, name:file.name, size:sizeFmt, type, date:new Date().toLocaleDateString('pt-BR'), category:guessCategory(file.name), localUrl, localBlob: file, extracted: false};
     S.files.unshift(fileObj);
     renderFiles();
@@ -1389,8 +1391,9 @@ async function viewFile(id) {
   if (!f) return;
 
   // 1. Try local blob URL first (available right after upload)
-  if (f.localUrl) {
-    window.open(f.localUrl, '_blank');
+  const blobUrl = (S.blobUrls && S.blobUrls[f.id]) || f.localUrl;
+  if (blobUrl) {
+    window.open(blobUrl, '_blank');
     return;
   }
 
@@ -1424,6 +1427,30 @@ async function viewFile(id) {
     } catch(e) { console.error('Signed URL error:', e); }
   }
 
+  // Last fallback: try direct public/download URL from Supabase
+  if (cfg.supabaseUrl && cfg.supabaseKey) {
+    const token = cfg.supabaseToken || cfg.supabaseKey;
+    const userId = S.user?.id || S.savedUserId || 'shared';
+    const storagePath = `${userId}/${f.id}_${f.name}`;
+    // Try direct download (works if bucket is public or with auth header via redirect)
+    const downloadUrl = `${cfg.supabaseUrl}/storage/v1/object/authenticated/healthhome-records/${storagePath}`;
+    // Open with token in URL as query param
+    const signUrl = `${cfg.supabaseUrl}/storage/v1/object/sign/healthhome-records/${storagePath}`;
+    try {
+      const token2 = cfg.supabaseToken || cfg.supabaseKey;
+      const r2 = await fetch(signUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token2}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresIn: 3600 })
+      });
+      const d2 = await r2.json();
+      if (d2.signedURL) {
+        const finalUrl = d2.signedURL.startsWith('http') ? d2.signedURL : `${cfg.supabaseUrl}/storage/v1${d2.signedURL}`;
+        window.open(finalUrl, '_blank');
+        return;
+      }
+    } catch(e2) { console.error(e2); }
+  }
   toast('Não foi possível abrir o arquivo. Tente fazer um novo upload.', 'warn');
 }
 
