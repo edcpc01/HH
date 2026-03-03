@@ -1171,10 +1171,24 @@ function setupUploadZone() {
   const zone = document.getElementById('uploadZone');
   const input = document.getElementById('fileInput');
   if (!zone || !input) return;
-  zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('dragover');});
-  zone.addEventListener('dragleave', ()=>zone.classList.remove('dragover'));
-  zone.addEventListener('drop', e=>{e.preventDefault();zone.classList.remove('dragover');handleFiles(e.dataTransfer.files);});
-  input.addEventListener('change', e=>handleFiles(e.target.files));
+
+  // Remove any existing listeners by cloning elements
+  const newZone = zone.cloneNode(true);
+  zone.parentNode.replaceChild(newZone, zone);
+  const newInput = newZone.querySelector('#fileInput') || document.getElementById('fileInput');
+
+  newZone.addEventListener('dragover', e=>{e.preventDefault();newZone.classList.add('dragover');});
+  newZone.addEventListener('dragleave', ()=>newZone.classList.remove('dragover'));
+  newZone.addEventListener('drop', e=>{e.preventDefault();newZone.classList.remove('dragover');handleFiles(e.dataTransfer.files);});
+
+  if (newInput) {
+    newInput.addEventListener('change', e=>{
+      if (e.target.files.length) {
+        handleFiles(e.target.files);
+        e.target.value = ''; // reset so same file can be uploaded again
+      }
+    });
+  }
 }
 
 async function handleFiles(files) {
@@ -1185,15 +1199,31 @@ async function handleFiles(files) {
     const type = file.type.startsWith('image/') ? 'image' : file.type==='application/pdf' ? 'pdf' : 'other';
 
     // Upload to Supabase Storage
-    if (cfg.supabaseUrl && cfg.supabaseKey) {
+    if (cfg.supabaseUrl && cfg.supabaseKey && !S.demo) {
       try {
-        const fname = `${S.user?.id||'demo'}/${id}_${file.name}`;
+        const token = cfg.supabaseToken || cfg.supabaseKey;
+        const userId = S.user?.id || 'shared';
+        const fname = `${userId}/${id}_${file.name}`;
         const r = await fetch(`${cfg.supabaseUrl}/storage/v1/object/healthhome-records/${fname}`, {
-          method:'POST', headers:{'Authorization':`Bearer ${cfg.supabaseKey}`,'Content-Type':file.type,'x-upsert':'true'}, body:file
+          method:'POST',
+          headers:{
+            'Authorization':`Bearer ${token}`,
+            'Content-Type': file.type,
+            'x-upsert':'true'
+          },
+          body:file
         });
-        if (!r.ok) throw new Error(await r.text());
-        toast(`${file.name} enviado!`,'success');
-      } catch(e) { toast(`Erro no upload: ${e.message}`,'error'); }
+        if (!r.ok) {
+          const errBody = await r.json().catch(()=>({message: r.statusText}));
+          throw new Error(errBody.message || errBody.error || r.statusText);
+        }
+        toast(`${file.name} enviado com sucesso!`,'success');
+      } catch(e) {
+        console.error('Storage upload error:', e);
+        toast(`Erro no upload: ${e.message}`,'error');
+      }
+    } else if (S.demo) {
+      toast(`${file.name} salvo localmente (modo demo)`, 'info');
     }
 
     const fileObj = {id,name:file.name,size:sizeFmt,type,date:new Date().toLocaleDateString('pt-BR'),category:guessCategory(file.name)};
