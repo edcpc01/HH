@@ -1226,15 +1226,22 @@ async function handleFiles(files) {
       toast(`${file.name} salvo localmente (modo demo)`, 'info');
     }
 
-    const fileObj = {id,name:file.name,size:sizeFmt,type,date:new Date().toLocaleDateString('pt-BR'),category:guessCategory(file.name)};
+    // Store local object URL for preview
+    const localUrl = URL.createObjectURL(file);
+    const fileObj = {id, name:file.name, size:sizeFmt, type, date:new Date().toLocaleDateString('pt-BR'), category:guessCategory(file.name), localUrl, localBlob: file, extracted: false};
     S.files.unshift(fileObj);
+    renderFiles();
 
-    // AI Extraction for PDFs and images
+    // AI Extraction — always try if key exists
     if ((type==='pdf'||type==='image') && cfg.anthropicKey) {
       await extractMarkersFromFile(file, fileObj);
+    } else if ((type==='pdf'||type==='image') && !cfg.anthropicKey) {
+      toast('Configure a chave Anthropic em Configurações para extração automática de marcadores', 'info');
     }
   }
-  localStorage.setItem('hh_files', JSON.stringify(S.files));
+  // Save without blob/localUrl (not serializable)
+  const toSave = S.files.map(({localBlob, localUrl, ...rest}) => rest);
+  localStorage.setItem('hh_files', JSON.stringify(toSave));
   renderFiles();
 }
 
@@ -1276,6 +1283,9 @@ async function extractMarkersFromFile(file, fileObj) {
       return;
     }
 
+    // Store fileObj globally for the import button
+    window.currentFileObj = fileObj;
+
     panel.innerHTML = `<div class="extract-result">
       <div class="extract-title">🧬 Marcadores extraídos de "${fileObj.name}"</div>
       ${extracted.markers.map(m=>`
@@ -1284,10 +1294,11 @@ async function extractMarkersFromFile(file, fileObj) {
           <span style="font-weight:600;color:var(--accent);">${m.value} ${m.unit||''}</span>
         </div>`).join('')}
       ${extracted.date?`<div style="font-size:11px;color:var(--text3);margin-top:6px;">Data do exame: ${extracted.date}</div>`:''}
-      <button class="btn btn-primary extract-save-btn" onclick="importExtractedMarkers(${JSON.stringify(extracted).replace(/"/g,'&quot;')})">
-        ✅ Importar marcadores para o prontuário
-      </button>
     </div>`;
+
+    // Auto-import immediately
+    toast('🧬 Marcadores encontrados! Importando automaticamente...', 'success');
+    await importExtractedMarkers(extracted, fileObj);
   } catch(e) {
     panel.innerHTML=`<div class="extract-result"><div class="extract-title" style="color:var(--warn);">⚠️ Erro na extração: ${e.message}</div></div>`;
   }
@@ -1305,7 +1316,7 @@ const EXTRACT_PROMPT = `Analise este exame médico e extraia os marcadores de sa
 Use as keys: glucose, cholesterol, pressure_sys, pressure_dia, hemoglobin, triglycerides, heart_rate, spo2.
 Se não encontrar um marcador, não o inclua. Extraia apenas valores numéricos presentes no documento.`;
 
-async function importExtractedMarkers(extracted) {
+async function importExtractedMarkers(extracted, fileObj) {
   let count = 0;
   for (const m of extracted.markers) {
     const key = m.key;
@@ -1320,9 +1331,13 @@ async function importExtractedMarkers(extracted) {
     S.timeline.unshift(ev);
     await saveEventToSupabase(ev);
   }
+  // Mark file as extracted
+  const fIdx = S.files.findIndex(x=>x.name===fileObj?.name);
+  if (fIdx>=0) S.files[fIdx].extracted = true;
   document.getElementById('extractionPanel').style.display='none';
   renderDashboard();
-  toast(`${count} marcadores importados com sucesso!`,'success');
+  renderFiles();
+  toast(`✅ ${count} marcadores importados! Dashboard atualizado.`,'success');
 }
 
 function fileToBase64(file) {
@@ -1349,7 +1364,7 @@ function renderFiles() {
   const grid = document.getElementById('filesGrid');
   const empty = document.getElementById('filesEmpty');
   const count = document.getElementById('fileCount');
-  if (!S.files.length) { grid.innerHTML=''; empty.style.display=''; if(count) count.textContent=''; return; }
+  if (!S.files.length) { grid.innerHTML=''; empty.style.display='block'; if(count) count.textContent=''; return; }
   empty.style.display='none';
   if (count) count.textContent=`${S.files.length} arquivo${S.files.length!==1?'s':''}`;
   const icons={pdf:'📄',image:'🖼️',other:'📎'};
@@ -1357,12 +1372,67 @@ function renderFiles() {
     <div class="file-icon">${icons[f.type]||'📎'}</div>
     <div class="file-name">${f.name}</div>
     <div class="file-meta">${f.size} · ${f.date}</div>
-    <div class="file-type-badge">${f.category}</div>
+    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+      <div class="file-type-badge">${f.category}</div>
+      ${f.extracted ? '<div class="file-type-badge" style="background:rgba(45,212,191,0.1);color:var(--accent);border:1px solid rgba(45,212,191,0.2);">✅ Extraído</div>' : ''}
+    </div>
     <div class="file-actions">
-      <button class="file-btn" onclick="toast('Acesso ao arquivo via Supabase Storage','info')">👁️ Ver</button>
+      <button class="file-btn" onclick="viewFile('${f.id}')">👁️ Ver</button>
+      ${!f.extracted && f.type !== 'other' ? `<button class="file-btn" style="color:var(--accent);" onclick="reExtractFile('${f.id}')">🧬 Extrair</button>` : ''}
       <button class="file-btn del" onclick="deleteFile('${f.id}')">🗑️</button>
     </div>
   </div>`).join('');
+}
+
+async function viewFile(id) {
+  const f = S.files.find(x=>x.id===id);
+  if (!f) return;
+
+  // 1. Try local blob URL first (available right after upload)
+  if (f.localUrl) {
+    window.open(f.localUrl, '_blank');
+    return;
+  }
+
+  // 2. Try signed URL from Supabase Storage
+  if (cfg.supabaseUrl && cfg.supabaseKey && !S.demo) {
+    try {
+      const token = cfg.supabaseToken || cfg.supabaseKey;
+      const userId = S.user?.id || S.savedUserId || 'shared';
+      // path must NOT be encoded in the URL itself, just the path segments
+      const storagePath = `${userId}/${f.id}_${f.name}`;
+      const r = await fetch(`${cfg.supabaseUrl}/storage/v1/object/sign/healthhome-records/${storagePath}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ expiresIn: 3600 })
+      });
+      if (r.ok) {
+        const data = await r.json();
+        // signedURL already contains /storage/v1/object/sign/...
+        const signedUrl = data.signedURL.startsWith('http')
+          ? data.signedURL
+          : `${cfg.supabaseUrl}/storage/v1${data.signedURL}`;
+        window.open(signedUrl, '_blank');
+        return;
+      } else {
+        const err = await r.json().catch(()=>({}));
+        console.warn('Signed URL failed:', err);
+      }
+    } catch(e) { console.error('Signed URL error:', e); }
+  }
+
+  toast('Não foi possível abrir o arquivo. Tente fazer um novo upload.', 'warn');
+}
+
+async function reExtractFile(id) {
+  const f = S.files.find(x=>x.id===id);
+  if (!f) return;
+  if (!cfg.anthropicKey) { toast('Configure a chave Anthropic para extração com IA', 'warn'); navigate('settings'); return; }
+  if (!f.localBlob) { toast('Arquivo não disponível localmente. Faça um novo upload para extração automática.', 'info'); return; }
+  await extractMarkersFromFile(f.localBlob, f);
 }
 
 function deleteFile(id) {
