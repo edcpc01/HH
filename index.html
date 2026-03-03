@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{--bg:#06101f;--surface:#0d1f38;--surface2:#122846;--surface3:#162f52;--border:#1e3a5f;--accent:#2dd4bf;--accent2:#38bdf8;--accent3:#fb7185;--gold:#fbbf24;--text:#e2eaf4;--text2:#7fa5c8;--text3:#4a6e8f;--success:#34d399;--warn:#fbbf24;--danger:#f87171;--purple:#a78bfa;--radius:16px;--radius-sm:10px;--radius-xs:6px;--shadow:0 4px 32px rgba(0,0,0,0.4);}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -1271,11 +1272,25 @@ async function extractMarkersFromFile(file, fileObj) {
     // Convert file to base64 text description for the AI
     let fileContext = '';
     if (file.type.startsWith('image/')) {
-      fileContext = '[Este é um exame médico em imagem]';
-    } else {
-      fileContext = '[Este é um exame médico em PDF]';
+      fileContext = 'Exame médico em imagem. Extraia todos os marcadores visíveis.';
+    } else if (file.type === 'application/pdf') {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+        let pdfText = '';
+        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+          const page = await pdf.getPage(i);
+          const tc = await page.getTextContent();
+          pdfText += tc.items.map(item => item.str).join(' ') + '\n';
+        }
+        fileContext = pdfText.slice(0, 8000);
+        console.log('PDF extraído:', fileContext.length, 'chars');
+      } catch(e) {
+        fileContext = 'Exame médico em PDF.';
+      }
     }
-    const text = await callGemini(`${fileContext}\n\n${EXTRACT_PROMPT}`, 1000);
+    const text = await callGemini(`${EXTRACT_PROMPT}\n\nConteúdo do exame:\n${fileContext}`, 1000);
     const clean = text.replace(/```json|```/g,'').trim();
     const extracted = JSON.parse(clean);
 
