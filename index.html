@@ -607,7 +607,7 @@ nav{flex:1;padding:16px 12px;overflow-y:auto;}
           <div class="card">
             <div class="card-header"><div class="card-title">🤖 Google Gemini (IA)</div></div>
             <div style="display:flex;flex-direction:column;gap:12px;">
-              <div class="form-group"><label class="form-label">API Key</label><div class="api-key-row"><input class="form-input" id="cfgAnthropic" type="password" placeholder="AIza..."/><button class="eye-btn" onclick="toggleEye('cfgAnthropic')">👁️</button></div><span class="form-hint">aistudio.google.com/app/apikey — gratuito</span></div>
+              <div class="form-group"><label class="form-label">API Key</label><div class="api-key-row"><input class="form-input" id="cfgAnthropic" type="password" placeholder="sk-or-... (OpenRouter) ou AIza... (Gemini)"/><button class="eye-btn" onclick="toggleEye('cfgAnthropic')">👁️</button></div><span class="form-hint">openrouter.ai/keys (gratuito, recomendado) ou aistudio.google.com</span></div>
               <button class="btn btn-primary" onclick="saveGeminiKey()">Salvar Chave</button>
             </div>
           </div>
@@ -1268,32 +1268,14 @@ async function extractMarkersFromFile(file, fileObj) {
     // file content is handled inline below for Gemini
 
     // Use Gemini with file content
-    const model = await getGeminiModel();
-    const gemUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
-    
-    // Build Gemini parts: inline_data + text prompt
-    const parts = [];
+    // Convert file to base64 text description for the AI
+    let fileContext = '';
     if (file.type.startsWith('image/')) {
-      const b64img = await fileToBase64(file);
-      parts.push({ inline_data: { mime_type: file.type, data: b64img } });
+      fileContext = '[Este é um exame médico em imagem]';
     } else {
-      // PDF: send as base64 inline_data
-      const b64pdf = await fileToBase64(file);
-      parts.push({ inline_data: { mime_type: 'application/pdf', data: b64pdf } });
+      fileContext = '[Este é um exame médico em PDF]';
     }
-    parts.push({ text: EXTRACT_PROMPT });
-
-    const resp = await fetch(gemUrl, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: { maxOutputTokens: 1000, temperature: 0.1 }
-      })
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error?.message || 'Erro Gemini');
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = await callGemini(`${fileContext}\n\n${EXTRACT_PROMPT}`, 1000);
     const clean = text.replace(/```json|```/g,'').trim();
     const extracted = JSON.parse(clean);
 
@@ -1585,25 +1567,40 @@ async function callClaude(prompt, maxTokens=800) {
   return callGemini(prompt, maxTokens);
 }
 
-async function getGeminiModel() {
-  if (cfg.geminiModel) return cfg.geminiModel;
-  const models = ['gemini-2.0-flash','gemini-1.5-flash','gemini-1.5-pro','gemini-pro','gemini-1.0-pro'];
-  for (const m of models) {
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${cfg.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:5}})});
-      const d = await r.json();
-      if (!d.error?.message?.includes('not found') && !d.error?.message?.includes('not supported')) {
-        cfg.geminiModel = m; saveConfig(); console.log('Using model:', m); return m;
-      }
-    } catch(e) {}
-  }
-  throw new Error('Nenhum modelo Gemini disponível. Verifique sua chave.');
-}
-
 async function callGemini(prompt, maxTokens=800) {
-  if (!cfg.geminiKey) throw new Error('Chave Gemini não configurada. Vá em Configurações.');
-  const model = await getGeminiModel();
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:maxTokens,temperature:0.3}})});
+  if (!cfg.geminiKey) throw new Error('Chave de IA não configurada. Vá em Configurações.');
+  // Try OpenRouter first (free, no regional limits), fallback to Gemini
+  const isOpenRouter = cfg.geminiKey.startsWith('sk-or-');
+  if (isOpenRouter) {
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cfg.geminiKey}`,
+        'HTTP-Referer': 'https://healthhome.vercel.app',
+        'X-Title': 'HealthHome'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens
+      })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error?.message || 'Erro OpenRouter');
+    return data.choices?.[0]?.message?.content || '';
+  }
+  // Gemini direct
+  const model = cfg.geminiModel || 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 }
+    })
+  });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error?.message || 'Erro Gemini API');
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
