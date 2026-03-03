@@ -1471,11 +1471,13 @@ async function viewFile(id) {
 }
 
 async function reExtractFile(id) {
+  if (S.extracting) { toast('Extração em andamento, aguarde...','warn'); return; }
   const f = S.files.find(x=>x.id===id);
   if (!f) return;
   if (!cfg.geminiKey) { toast('Configure a chave Gemini para extração com IA', 'warn'); navigate('settings'); return; }
-  if (!f.localBlob) { toast('Arquivo não disponível localmente. Faça um novo upload para extração automática.', 'info'); return; }
-  await extractMarkersFromFile(f.localBlob, f);
+  if (!f.localBlob) { toast('Arquivo não disponível. Faça um novo upload.', 'info'); return; }
+  S.extracting = true;
+  try { await extractMarkersFromFile(f.localBlob, f); } finally { S.extracting = false; }
 }
 
 function deleteFile(id) {
