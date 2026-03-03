@@ -1258,7 +1258,7 @@ async function extractMarkersFromFile(file, fileObj) {
     // file content is handled inline below for Gemini
 
     // Use Gemini with file content
-    const model = 'gemini-1.5-flash';
+    const model = 'gemini-1.5-flash-latest';
     const gemUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
     
     // Build Gemini parts: inline_data + text prompt
@@ -1575,7 +1575,7 @@ async function callClaude(prompt, maxTokens=800) {
 
 async function callGemini(prompt, maxTokens=800) {
   if (!cfg.geminiKey) throw new Error('Chave Gemini não configurada. Vá em Configurações e adicione sua API Key do Google Gemini (gratuito em aistudio.google.com).');
-  const model = 'gemini-1.5-flash';
+  const model = 'gemini-1.5-flash-latest';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
   const r = await fetch(url, {
     method: 'POST',
