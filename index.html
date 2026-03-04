@@ -733,21 +733,33 @@ async function loadFromSupabase() {
 }
 
 async function saveMarkerToSupabase(key, value) {
-  if (!cfg.supabaseUrl || !cfg.supabaseKey || !S.user) return;
+  if (!cfg.supabaseUrl || !cfg.supabaseKey) return;
+  // Save locally always
+  if (!S.markers[key]) S.markers[key] = [];
   try {
+    if (!S.user || S.demo) return; // skip DB in demo mode
     await sbFetch('health_markers', {
       method: 'POST',
       body: JSON.stringify({ user_id: S.user.id, marker_key: key, value, recorded_at: new Date().toISOString() })
     });
-  } catch(e) { console.error('Save marker:', e); }
+  } catch(e) { console.warn('Save marker to DB failed (saving locally only):', e.message); }
 }
 
 async function saveEventToSupabase(ev) {
   if (!cfg.supabaseUrl || !cfg.supabaseKey || !S.user) return;
   try {
+    // Map local fields to DB columns
+    const dbEv = {
+      user_id: S.user.id,
+      type: ev.type,
+      title: ev.title,
+      date: ev.date,
+      description: ev.desc || ev.description || '',
+      tags: ev.tags || []
+    };
     await sbFetch('timeline_events', {
       method: 'POST',
-      body: JSON.stringify({ ...ev, user_id: S.user.id })
+      body: JSON.stringify(dbEv)
     });
   } catch(e) { console.error('Save event:', e); }
 }
@@ -1289,7 +1301,12 @@ async function extractMarkersFromFile(file, fileObj) {
       }
     }
     const text = await callGemini(`${EXTRACT_PROMPT}\n\nConteúdo do exame:\n${fileContext}`, 1000);
-    const clean = text.replace(/```json|```/g,'').trim();
+    // Remove <think> blocks (reasoning models) and extract JSON
+    let jsonStr = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Nenhum JSON na resposta da IA');
+    const clean = jsonMatch[0];
+    console.log('AI JSON extraído:', clean.slice(0, 300));
     const extracted = JSON.parse(clean);
 
     if (!extracted.markers?.length) {
