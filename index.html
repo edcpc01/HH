@@ -287,10 +287,10 @@ nav{flex:1;padding:16px 12px;overflow-y:auto;}
       <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Cadastrar</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="form-group"><label class="form-label">E-mail</label><input class="form-input" id="authEmail" type="email" placeholder="seu@email.com"/></div>
+      <div class="form-group"><label class="form-label">E-mail</label><input class="form-input" id="authEmail" type="email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')handleAuth()"/></div>
       <div class="form-group">
         <label class="form-label">Senha</label>
-        <div class="api-key-row"><input class="form-input" id="authPass" type="password" placeholder="••••••••"/><button class="eye-btn" onclick="toggleEye('authPass')">👁️</button></div>
+        <div class="api-key-row"><input class="form-input" id="authPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuth()"/><button class="eye-btn" onclick="toggleEye('authPass')">👁️</button></div>
       </div>
       <div id="registerExtra" style="display:none;flex-direction:column;gap:12px;">
         <div class="form-group"><label class="form-label">Nome completo</label><input class="form-input" id="authName" placeholder="Seu nome"/></div>
@@ -740,7 +740,7 @@ async function saveMarkerToSupabase(key, value) {
     if (!S.user || S.demo) return; // skip DB in demo mode
     await sbFetch('health_markers', {
       method: 'POST',
-      body: JSON.stringify({ user_id: S.user.id, marker_key: key, value, recorded_at: new Date().toISOString() })
+      body: JSON.stringify({ user_id: S.user.id, marker_key: key, value: parseFloat(value), recorded_at: new Date().toISOString() })
     });
   } catch(e) { console.warn('Save marker to DB failed (saving locally only):', e.message); }
 }
@@ -755,7 +755,7 @@ async function saveEventToSupabase(ev) {
       title: ev.title,
       date: ev.date,
       description: ev.desc || ev.description || '',
-      tags: ev.tags || []
+      tags: JSON.stringify(ev.tags || [])
     };
     await sbFetch('timeline_events', {
       method: 'POST',
@@ -1335,17 +1335,22 @@ async function extractMarkersFromFile(file, fileObj) {
   }
 }
 
-const EXTRACT_PROMPT = `Analise este exame médico e extraia os marcadores de saúde. Responda APENAS em JSON:
-{
-  "markers": [
-    {"key": "glucose", "name": "Glicose", "value": 95, "unit": "mg/dL"},
-    {"key": "hemoglobin", "name": "Hemoglobina", "value": 14.2, "unit": "g/dL"}
-  ],
-  "date": "2025-11-15",
-  "exam_type": "Hemograma"
-}
-Use as keys: glucose, cholesterol, pressure_sys, pressure_dia, hemoglobin, triglycerides, heart_rate, spo2.
-Se não encontrar um marcador, não o inclua. Extraia apenas valores numéricos presentes no documento.`;
+const EXTRACT_PROMPT = `Você é um especialista em análise de exames laboratoriais. Analise o texto do exame abaixo e extraia TODOS os marcadores de saúde encontrados.
+
+REGRAS IMPORTANTES:
+- Extraia TODOS os valores numéricos que forem marcadores de saúde
+- Use EXATAMENTE as keys abaixo quando o marcador corresponder:
+  glucose (Glicose/Glicemia), cholesterol (Colesterol Total), pressure_sys (Pressão Sistólica),
+  pressure_dia (Pressão Diastólica), hemoglobin (Hemoglobina), triglycerides (Triglicerídeos),
+  heart_rate (Frequência Cardíaca), spo2 (Saturação O2/SpO2), hdl (HDL), ldl (LDL),
+  hematocrit (Hematócrito), leukocytes (Leucócitos), platelets (Plaquetas),
+  creatinine (Creatinina), urea (Ureia), tsh (TSH), t4 (T4 Livre), ferritin (Ferritina),
+  vitamin_d (Vitamina D), b12 (Vitamina B12), uric_acid (Ácido Úrico)
+- Para marcadores não listados acima, crie uma key em snake_case
+- Responda APENAS com JSON válido, sem texto antes ou depois
+
+FORMATO OBRIGATÓRIO:
+{"markers":[{"key":"glucose","name":"Glicose","value":95,"unit":"mg/dL"},{"key":"hemoglobin","name":"Hemoglobina","value":14.1,"unit":"g/dL"}],"date":"2026-01-08","exam_type":"Hemograma"}`;
 
 async function importExtractedMarkers(extracted, fileObj) {
   let count = 0;
