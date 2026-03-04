@@ -1594,7 +1594,7 @@ async function callGemini(prompt, maxTokens=800) {
         'X-Title': 'HealthHome'
       },
       body: JSON.stringify({
-        model: 'qwen/qwen3-coder:free',
+        model: 'arcee-ai/trinity-large-preview:free',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: maxTokens
       })
@@ -1605,7 +1605,7 @@ async function callGemini(prompt, maxTokens=800) {
       await new Promise(res => setTimeout(res, 15000));
       const r2 = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${cfg.geminiKey}`,'HTTP-Referer':'https://healthhome.vercel.app','X-Title':'HealthHome'},
-        body: JSON.stringify({model:'qwen/qwen3-coder:free', messages:[{role:'user',content:prompt}], max_tokens:maxTokens})
+        body: JSON.stringify({model:'arcee-ai/trinity-large-preview:free', messages:[{role:'user',content:prompt}], max_tokens:maxTokens})
       });
       const d2 = await r2.json();
       if (!r2.ok) throw new Error(d2.error?.message || 'Erro OpenRouter após retry');
