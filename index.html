@@ -740,7 +740,7 @@ async function saveMarkerToSupabase(key, value) {
     if (!S.user || S.demo) return; // skip DB in demo mode
     await sbFetch('health_markers', {
       method: 'POST',
-      body: JSON.stringify({ user_id: S.user.id, marker_key: key, value: parseFloat(value), recorded_at: new Date().toISOString() })
+      body: JSON.stringify({ user_id: S.user?.id || S.user?.email || 'anon', marker_key: key, value: parseFloat(value), recorded_at: new Date().toISOString() })
     });
   } catch(e) { console.warn('Save marker to DB failed (saving locally only):', e.message); }
 }
@@ -750,7 +750,7 @@ async function saveEventToSupabase(ev) {
   try {
     // Map local fields to DB columns
     const dbEv = {
-      user_id: S.user.id,
+      user_id: S.user?.id || S.user?.email || 'anon',
       type: ev.type,
       title: ev.title,
       date: ev.date,
@@ -821,8 +821,9 @@ async function handleAuth() {
 
     cfg.supabaseToken = data.access_token;
     cfg.supabaseKey = data.access_token || cfg.supabaseKey;
-    S.user = data.user || { id: data.user?.id, email };
+    S.user = { id: data.user?.id || data.id || email, email: data.user?.email || email };
     cfg.role = data.user?.user_metadata?.role || selectedRole;
+    cfg.savedUser = S.user;  // persist session
     S.profile = cfg.role;
     saveConfig();
 
