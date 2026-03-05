@@ -721,12 +721,20 @@ async function loadFromSupabase() {
       const grouped = {};
       markers.value.forEach(m => {
         if (!grouped[m.marker_key]) grouped[m.marker_key] = [];
-        grouped[m.marker_key].unshift(m.value);
+        grouped[m.marker_key].unshift(parseFloat(m.value) || m.value);
       });
       S.markers = { ...S.markers, ...grouped };
+      localStorage.setItem('hh_markers', JSON.stringify(S.markers));
     }
     if (timeline.status === 'fulfilled' && timeline.value?.length) {
-      S.timeline = timeline.value.map(e => ({...e, desc: e.desc || e.description || ''}));
+      // Merge DB timeline with local, deduplicate by title+date
+      const dbTimeline = timeline.value.map(e => ({...e, desc: e.desc || e.description || ''}));
+      const localTimeline = S.timeline || [];
+      const merged = [...dbTimeline];
+      localTimeline.forEach(le => {
+        if (!merged.some(de => de.title === le.title && de.date === le.date)) merged.push(le);
+      });
+      S.timeline = merged.sort((a,b) => b.date?.localeCompare(a.date));
     }
     if (patients.status === 'fulfilled' && patients.value?.length) S.patients = patients.value;
     if (files.status === 'fulfilled' && files.value?.length) S.files = files.value;
