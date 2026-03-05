@@ -725,7 +725,9 @@ async function loadFromSupabase() {
       });
       S.markers = { ...S.markers, ...grouped };
     }
-    if (timeline.status === 'fulfilled' && timeline.value?.length) S.timeline = timeline.value;
+    if (timeline.status === 'fulfilled' && timeline.value?.length) {
+      S.timeline = timeline.value.map(e => ({...e, desc: e.desc || e.description || ''}));
+    }
     if (patients.status === 'fulfilled' && patients.value?.length) S.patients = patients.value;
     if (files.status === 'fulfilled' && files.value?.length) S.files = files.value;
     return true;
@@ -857,9 +859,17 @@ async function bootApp() {
   loadingBar(40);
   document.getElementById('authScreen').style.display = 'none';
 
+  // Load from localStorage first (fast, offline)
+  const savedMarkers = localStorage.getItem('hh_markers');
+  if (savedMarkers) { try { S.markers = {...S.markers, ...JSON.parse(savedMarkers)}; } catch(e){} }
+  const savedFiles = localStorage.getItem('hh_files');
+  if (savedFiles) { try { S.files = JSON.parse(savedFiles); } catch(e){} }
+  const savedTimeline = localStorage.getItem('hh_timeline');
+  if (savedTimeline) { try { S.timeline = JSON.parse(savedTimeline); } catch(e){} }
+
   if (!S.demo) {
     const loaded = await loadFromSupabase();
-    if (!loaded) { seedDemoData(); }
+    if (!loaded && !savedMarkers) { seedDemoData(); }
   }
 
   updateSidebarProfile();
@@ -1174,8 +1184,8 @@ function displayTimeline(items) {
       <div class="timeline-date">${d}</div>
       <div class="timeline-card">
         <div class="timeline-title">${icons[it.type]||'📋'} ${it.title}</div>
-        <div class="timeline-desc">${it.desc}</div>
-        ${it.tags?.length?`<div class="timeline-tags">${it.tags.map(t=>`<span class="tag teal">${t}</span>`).join('')}</div>`:''}
+        <div class="timeline-desc">${it.desc||it.description||''}</div>
+        ${(()=>{const tags=typeof it.tags==='string'?JSON.parse(it.tags||'[]'):it.tags||[];return tags.length?`<div class="timeline-tags">${tags.map(t=>`<span class="tag teal">${t}</span>`).join('')}</div>`:'';})()}
       </div>
     </div>`;
   }).join('');
@@ -1200,6 +1210,7 @@ async function saveEvent() {
   };
   if (!ev.title||!ev.date) { toast('Preencha título e data','error'); return; }
   S.timeline.unshift(ev);
+  localStorage.setItem('hh_timeline', JSON.stringify(S.timeline));
   await saveEventToSupabase(ev);
   closeModal('addEventModal');
   renderTimeline();
@@ -1384,6 +1395,7 @@ async function importExtractedMarkers(extracted, fileObj) {
   if (extracted.date || extracted.exam_type) {
     const ev = {id:Date.now(),date:extracted.date||new Date().toISOString().slice(0,10),type:'exam',title:extracted.exam_type||'Exame Importado',desc:`${count} marcadores importados via IA.`,tags:['IA','Importado']};
     S.timeline.unshift(ev);
+    localStorage.setItem('hh_timeline', JSON.stringify(S.timeline));
     await saveEventToSupabase(ev);
   }
   // Mark file as extracted
@@ -1943,8 +1955,8 @@ function renderProntuario() {
           <div class="timeline-date">${d}</div>
           <div class="timeline-card">
             <div class="timeline-title">${icons[it.type]||'📋'} ${it.title}</div>
-            <div class="timeline-desc">${it.desc}</div>
-            ${it.tags?.length?`<div class="timeline-tags">${it.tags.map(t=>`<span class="tag teal">${t}</span>`).join('')}</div>`:''}
+            <div class="timeline-desc">${it.desc||it.description||''}</div>
+            ${(()=>{const tags=typeof it.tags==='string'?JSON.parse(it.tags||'[]'):it.tags||[];return tags.length?`<div class="timeline-tags">${tags.map(t=>`<span class="tag teal">${t}</span>`).join('')}</div>`:'';})()}
           </div></div>`;
       }).join('')
     : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Sem histórico</div></div>';
