@@ -1180,18 +1180,14 @@ function showMarkerEvolution(key) {
   if (mainChart) mainChart.destroy();
   const ctx = document.getElementById('mainChart').getContext('2d');
   const rawData = S.markers[key] || [];
-  const data = rawData.map(d => typeof d === 'object' ? d.value : d);
-  // FIX: always use real date from {value, date} object; for legacy plain numbers
-  // fall back to estimating date going back from today month-by-month
-  const labels = rawData.map((d, i) => {
-    if (typeof d === 'object' && d.date) {
-      return new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
-    }
-    // Legacy: estimate date (n months ago)
-    const est = new Date();
-    est.setMonth(est.getMonth() - (rawData.length - 1 - i));
-    return est.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
-  });
+  // FIX: show ONLY points with real laudo dates — no fake monthly estimates
+  const datedEntries = rawData.filter(d => typeof d === 'object' && d.date);
+  const plotData = datedEntries.length > 0 ? datedEntries : rawData.map(d => ({value: typeof d === 'object' ? d.value : d, date: null}));
+  const data = plotData.map(d => d.value ?? d);
+  const labels = plotData.map((d, i) => d.date
+    ? new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'})
+    : `Reg. ${i + 1}`
+  );
   const color = meta.color || '#2dd4bf';
   const g = ctx.createLinearGradient(0,0,0,220);
   g.addColorStop(0, color+'38'); g.addColorStop(1, color+'00');
