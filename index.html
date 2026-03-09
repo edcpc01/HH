@@ -424,39 +424,22 @@ nav{flex:1;padding:16px 12px;overflow-y:auto;}
       <!-- DASHBOARD -->
       <div class="page active" id="page-dashboard">
         <div class="stats-grid" id="statsGrid"></div>
-        <div class="charts-grid">
-          <div class="card">
-            <div class="card-header">
-              <div><div class="card-title">Evolução de Marcadores</div><div class="card-subtitle">Últimos registros</div></div>
-              <select class="form-select" id="markerSelect" style="width:150px;padding:6px 10px;" onchange="updateMainChart()">
-                <option value="glucose">Glicose</option>
-                <option value="cholesterol">Colesterol</option>
-                <option value="pressure_sys">P. Sistólica</option>
-                <option value="hemoglobin">Hemoglobina</option>
-                <option value="heart_rate">Freq. Cardíaca</option>
-                <option value="spo2">SpO2</option>
-              </select>
-            </div>
-            <div class="chart-container"><canvas id="mainChart"></canvas></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header">
+            <div class="card-title">Marcadores</div>
+            <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;" onclick="openAddMarker()">+ Registrar</button>
           </div>
-          <div class="card">
-            <div class="card-header"><div class="card-title">Status Geral</div></div>
-            <div class="chart-container"><canvas id="radarChart"></canvas></div>
-          </div>
+          <div id="markersTable"></div>
         </div>
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Marcadores</div>
-              <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;" onclick="openAddMarker()">+ Registrar</button>
-            </div>
-            <div id="markersTable"></div>
+        <div class="card" style="margin-bottom:16px; display:none;" id="markerEvolutionCard">
+          <div class="card-header">
+            <div><div class="card-title" id="markerEvolutionTitle">Evolução</div><div class="card-subtitle">Últimos registros</div></div>
+            <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;" onclick="document.getElementById('markerEvolutionCard').style.display='none'">✕ Fechar</button>
           </div>
-          <div class="card">
-            <div class="card-header"><div class="card-title">Resumo de Saúde</div></div>
-            <div id="healthSummary"></div>
-          </div>
+          <div class="chart-container"><canvas id="mainChart"></canvas></div>
         </div>
+        <!-- Hidden canvases needed for chart instances -->
+        <canvas id="radarChart" style="display:none"></canvas>
       </div>
 
       <!-- TIMELINE -->
@@ -1153,26 +1136,78 @@ function renderHealthSummary() {
 function renderStats() {
   const grid = document.getElementById('statsGrid');
   const bleCount = Object.values(S.bleDevices).filter(d=>d.connected).length;
-  const cards = [
-    {icon:'💉',value:S.markers.glucose?.at(-1)||'—',unit:'mg/dL',label:'Glicose',cls:'teal',delta:S.markers.glucose?.length>1?((S.markers.glucose.at(-1)-S.markers.glucose.at(-2)).toFixed(1)):null},
-    {icon:'🫁',value:S.markers.cholesterol?.at(-1)||'—',unit:'mg/dL',label:'Colesterol',cls:'blue',delta:null},
-    {icon:'❤️',value:`${S.markers.pressure_sys?.at(-1)||'—'}/${S.markers.pressure_dia?.at(-1)||'—'}`,unit:'mmHg',label:'Pressão',cls:'pink',delta:null},
-    {icon:'💓',value:S.markers.heart_rate?.at(-1)||'—',unit:'bpm',label:'Freq. Cardíaca',cls:'gold',delta:null,ble:S.bleDevices['heart_rate']?.connected},
-    {icon:'📡',value:bleCount,unit:'',label:'Wearables Ativos',cls:'purple',delta:null},
-  ];
-  grid.innerHTML = cards.map(c=>`<div class="stat-card ${c.cls}" onclick="navigate(${c.cls==='purple'?'\'wearables\'':'\'dashboard\''})">
-    <div class="stat-icon">${c.icon}</div>
-    <div><span class="stat-value">${c.value}</span>${c.unit?`<span class="stat-unit"> ${c.unit}</span>`:''}</div>
-    <div class="stat-label">${c.label}</div>
-    ${c.delta!==null?`<div class="stat-delta ${c.delta>0?'delta-down':'delta-up'}">${c.delta>0?'▲':'▼'} ${Math.abs(c.delta)}</div>`:''}
-    ${c.ble?`<div class="ble-badge">BLE ao vivo</div>`:''}
-  </div>`).join('');
+
+  // Priority markers for top cards
+  const PRIORITY = ['glucose','hemoglobin','cholesterol','pressure_sys','triglycerides','vitamin_d','b12','creatinine','hdl','ldl'];
+  const hasMarkers = Object.keys(S.markers).filter(k => S.markers[k]?.length > 0);
+  const toShow = [...new Set([...PRIORITY.filter(k=>hasMarkers.includes(k)), ...hasMarkers])].slice(0, 6);
+
+  // Always show wearables card
+  const bleCard = `<div class="stat-card purple" onclick="navigate('wearables')">
+    <div class="stat-icon">📡</div>
+    <div><span class="stat-value">${bleCount}</span></div>
+    <div class="stat-label">Wearables Ativos</div>
+  </div>`;
+
+  if (!toShow.length) {
+    grid.innerHTML = `<div class="stat-card teal" style="grid-column:span 2;opacity:.6;">
+      <div class="stat-icon">💉</div><div class="stat-label">Extraia um exame para ver seus marcadores aqui</div>
+    </div>` + bleCard;
+    return;
+  }
+
+  // Pressure special case
+  const cards = toShow.map(k => {
+    const meta = MARKER_META[k] || {label:k, unit:'', ref:[0,9999], color:'#7fa5c8'};
+    let val, unit;
+    if (k === 'pressure_sys') {
+      val = `${S.markers.pressure_sys?.at(-1)||'—'}/${S.markers.pressure_dia?.at(-1)||'—'}`;
+      unit = 'mmHg';
+    } else {
+      val = S.markers[k]?.at(-1) ?? '—';
+      unit = meta.unit;
+    }
+    const [lo,hi] = meta.ref;
+    const n = parseFloat(val);
+    const bad = !isNaN(n) && (n > hi*1.15 || n < lo*0.85);
+    const ok = !isNaN(n) && n >= lo && n <= hi;
+    const color = bad ? 'var(--danger)' : ok ? 'var(--success)' : 'var(--warn)';
+    const delta = S.markers[k]?.length > 1 ? (S.markers[k].at(-1) - S.markers[k].at(-2)).toFixed(1) : null;
+    return `<div class="stat-card" style="cursor:pointer;border-color:${meta.color}22;" onclick="showMarkerEvolution('${k}')">
+      <div class="stat-icon">${bad?'⚠️':ok?'✅':'📊'}</div>
+      <div><span class="stat-value" style="color:${color};">${val}</span><span class="stat-unit"> ${unit}</span></div>
+      <div class="stat-label">${meta.label}</div>
+      ${delta!==null?`<div class="stat-delta ${parseFloat(delta)>0?'delta-down':'delta-up'}">${parseFloat(delta)>0?'▲':'▼'} ${Math.abs(delta)}</div>`:''}
+    </div>`;
+  });
+
+  grid.innerHTML = cards.join('') + bleCard;
+}
+
+function showMarkerEvolution(key) {
+  const card = document.getElementById('markerEvolutionCard');
+  const title = document.getElementById('markerEvolutionTitle');
+  const meta = MARKER_META[key] || {label:key, unit:''};
+  title.textContent = `Evolução — ${meta.label}`;
+  card.style.display = 'block';
+  card.scrollIntoView({behavior:'smooth', block:'start'});
+  // Update chart
+  if (mainChart) mainChart.destroy();
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  const data = S.markers[key] || [];
+  const labels = data.map((_,i) => `#${i+1}`);
+  const color = meta.color || '#2dd4bf';
+  const g = ctx.createLinearGradient(0,0,0,220);
+  g.addColorStop(0, color+'38'); g.addColorStop(1, color+'00');
+  mainChart = new Chart(ctx, {
+    type:'line',
+    data:{labels, datasets:[{data, backgroundColor:g, borderColor:color, tension:.4, fill:true, pointBackgroundColor:color, pointRadius:4, borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e3a5f'},ticks:{color:'#7fa5c8'}},y:{grid:{color:'#1e3a5f'},ticks:{color:'#7fa5c8'}}}}
+  });
 }
 
 function renderDashboard() {
   renderStats();
-  updateMainChart();
-  renderRadarChart();
   renderMarkersTable();
   renderHealthSummary();
 }
