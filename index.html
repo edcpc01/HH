@@ -1096,14 +1096,16 @@ function renderMarkersTable() {
     const cls = bad ? 'bad' : ok ? 'ok' : 'warn';
     const sCls = bad ? 'status-bad' : ok ? 'status-ok' : 'status-warn';
     const sLabel = bad ? 'Atenção' : ok ? 'Normal' : 'Limítrofe';
-    return `<div class="marker-row">
+    const hasHistory = (S.markers[k]?.length || 0) > 1;
+    return `<div class="marker-row" style="cursor:pointer;" onclick="showMarkerEvolution('${k}')" title="Ver evolução">
       <div style="flex:1;min-width:80px;">
-        <div style="font-size:13px;font-weight:500;">${meta.label}</div>
+        <div style="font-size:13px;font-weight:500;">${meta.label} ${hasHistory?'<span style=\"font-size:10px;color:var(--text3);\">('+S.markers[k].length+' registros)</span>':''}</div>
         <div style="font-size:10px;color:var(--text3);">${lo}–${hi} ${meta.unit}</div>
       </div>
       <div class="marker-bar-bg"><div class="marker-bar-fill ${cls}" style="width:${pct}%"></div></div>
       <div style="font-size:15px;font-weight:600;min-width:80px;text-align:right;color:${bad?'var(--danger)':ok?'var(--success)':'var(--warn)'};">${v}<span style="font-size:10px;color:var(--text3);"> ${meta.unit}</span></div>
       <div class="marker-status ${sCls}">${sLabel}</div>
+      <div style="font-size:16px;color:var(--text3);margin-left:6px;">📈</div>
     </div>`;
   }
 
