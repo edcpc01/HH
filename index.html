@@ -287,10 +287,10 @@ nav{flex:1;padding:16px 12px;overflow-y:auto;}
       <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Cadastrar</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="form-group"><label class="form-label">E-mail</label><input class="form-input" id="authEmail" type="email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')handleAuth()"/></div>
+      <div class="form-group"><label class="form-label">E-mail</label><input class="form-input" id="authEmail" type="email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')window.handleAuth&&window.handleAuth()"/></div>
       <div class="form-group">
         <label class="form-label">Senha</label>
-        <div class="api-key-row"><input class="form-input" id="authPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuth()"/><button class="eye-btn" onclick="toggleEye('authPass')">👁️</button></div>
+        <div class="api-key-row"><input class="form-input" id="authPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')window.handleAuth&&window.handleAuth()"/><button class="eye-btn" onclick="toggleEye('authPass')">👁️</button></div>
       </div>
       <div id="registerExtra" style="display:none;flex-direction:column;gap:12px;">
         <div class="form-group"><label class="form-label">Nome completo</label><input class="form-input" id="authName" placeholder="Seu nome"/></div>
@@ -302,9 +302,9 @@ nav{flex:1;padding:16px 12px;overflow-y:auto;}
           </div>
         </div>
       </div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="handleAuth()"><span id="authBtnText">Entrar</span></button>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="window.handleAuth&&window.handleAuth()"><span id="authBtnText">Entrar</span></button>
       <div style="text-align:center;font-size:12px;color:var(--text3);">— ou —</div>
-      <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="enterDemoMode()">🎮 Continuar em modo demo</button>
+      <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="window.enterDemoMode&&window.enterDemoMode()">🎮 Continuar em modo demo</button>
       <div id="authStatus" style="font-size:13px;min-height:20px;text-align:center;"></div>
       <div style="font-size:11px;color:var(--text3);text-align:center;">Configure o Supabase nas Configurações para auth real</div>
     </div>
@@ -1479,8 +1479,8 @@ async function importExtractedMarkers(extracted, fileObj) {
     await saveEventToSupabase(ev);
   }
   // Mark file as extracted
-  const fIdx = S.files.findIndex(x=>x.name===fileObj?.name);
-  if (fIdx>=0) S.files[fIdx].extracted = true;
+  const fIdx2 = S.files.findIndex(x=>x.name===fileObj?.name);
+  if (fIdx2>=0) S.files[fIdx2].extracted = true;
   document.getElementById('extractionPanel').style.display='none';
   renderDashboard();
   renderFiles();
