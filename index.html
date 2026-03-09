@@ -1396,9 +1396,11 @@ async function importExtractedMarkers(extracted, fileObj) {
   let count = 0;
   for (const m of extracted.markers) {
     const key = m.key;
+    const val = parseFloat(m.value);
+    if (!key || m.value === null || m.value === undefined || isNaN(val)) continue; // skip invalid
     if (!S.markers[key]) S.markers[key] = [];
-    S.markers[key].push(m.value);
-    await saveMarkerToSupabase(key, m.value);
+    S.markers[key].push(val);
+    await saveMarkerToSupabase(key, val);
     count++;
   }
   localStorage.setItem('hh_markers', JSON.stringify(S.markers));
