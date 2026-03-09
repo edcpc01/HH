@@ -1174,21 +1174,57 @@ function showMarkerEvolution(key) {
   const card = document.getElementById('markerEvolutionCard');
   const title = document.getElementById('markerEvolutionTitle');
   const meta = MARKER_META[key] || {label:key, unit:''};
-  title.textContent = `Evolução — ${meta.label}`;
+  title.textContent = `Evolução — ${meta.label} (${meta.unit})`;
   card.style.display = 'block';
   card.scrollIntoView({behavior:'smooth', block:'start'});
   if (mainChart) mainChart.destroy();
   const ctx = document.getElementById('mainChart').getContext('2d');
   const rawData = S.markers[key] || [];
   const data = rawData.map(d => typeof d === 'object' ? d.value : d);
-  const labels = rawData.map((d,i) => typeof d === 'object' && d.date ? new Date(d.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : `#${i+1}`);
+  // FIX: always use real date from {value, date} object; for legacy plain numbers
+  // fall back to estimating date going back from today month-by-month
+  const labels = rawData.map((d, i) => {
+    if (typeof d === 'object' && d.date) {
+      return new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+    }
+    // Legacy: estimate date (n months ago)
+    const est = new Date();
+    est.setMonth(est.getMonth() - (rawData.length - 1 - i));
+    return est.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+  });
   const color = meta.color || '#2dd4bf';
   const g = ctx.createLinearGradient(0,0,0,220);
   g.addColorStop(0, color+'38'); g.addColorStop(1, color+'00');
+  // Reference lines
+  const [lo, hi] = meta.ref || [null, null];
   mainChart = new Chart(ctx, {
     type:'line',
-    data:{labels, datasets:[{data, backgroundColor:g, borderColor:color, tension:.4, fill:true, pointBackgroundColor:color, pointRadius:4, borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e3a5f'},ticks:{color:'#7fa5c8'}},y:{grid:{color:'#1e3a5f'},ticks:{color:'#7fa5c8'}}}}
+    data:{labels, datasets:[
+      {data, backgroundColor:g, borderColor:color, tension:.4, fill:true, pointBackgroundColor:color, pointRadius:5, pointHoverRadius:7, borderWidth:2.5, label: meta.label},
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0d1f38', borderColor:'#1e3a5f', borderWidth:1,
+          callbacks:{
+            label: ctx => ` ${ctx.parsed.y} ${meta.unit}`,
+            title: ctx => ctx[0].label,
+          }
+        },
+        annotation: lo && hi ? {
+          annotations:{
+            refHi:{type:'line',yMin:hi,yMax:hi,borderColor:'rgba(248,113,113,0.4)',borderWidth:1,borderDash:[4,4],label:{content:`Máx: ${hi}`,display:true,color:'#f87171',font:{size:10},position:'end'}},
+            refLo:{type:'line',yMin:lo,yMax:lo,borderColor:'rgba(52,211,153,0.4)',borderWidth:1,borderDash:[4,4],label:{content:`Mín: ${lo}`,display:true,color:'#34d399',font:{size:10},position:'end'}},
+          }
+        } : {}
+      },
+      scales:{
+        x:{grid:{color:'#1e3a5f44'}, ticks:{color:'#7fa5c8', font:{size:10}, maxRotation:45, minRotation:30}},
+        y:{grid:{color:'#1e3a5f44'}, ticks:{color:'#7fa5c8', font:{size:11}}}
+      }
+    }
   });
 }
 
@@ -1307,6 +1343,17 @@ function setupUploadZone() {
 
 async function handleFiles(files) {
   for (const file of files) {
+    // FIX: Block duplicate uploads — check by filename (case-insensitive) + file size in bytes
+    const sizeKbCheck = file.size/1024;
+    const sizeFmtCheck = sizeKbCheck>1024 ? `${(sizeKbCheck/1024).toFixed(1)} MB` : `${sizeKbCheck.toFixed(0)} KB`;
+    const alreadyExists = S.files.some(f =>
+      f.name.toLowerCase() === file.name.toLowerCase() && f.size === sizeFmtCheck
+    );
+    if (alreadyExists) {
+      toast(`⚠️ "${file.name}" já existe na lista. Upload duplicado bloqueado.`, 'error');
+      continue;
+    }
+
     const id = Date.now()+'_'+Math.random().toString(36).slice(2);
     const sizeKb = file.size/1024;
     const sizeFmt = sizeKb>1024 ? `${(sizeKb/1024).toFixed(1)} MB` : `${sizeKb.toFixed(0)} KB`;
