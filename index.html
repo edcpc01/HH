@@ -883,7 +883,9 @@ async function bootApp() {
   updateSidebarProfile();
   renderNav();
   setupUploadZone();
-  renderDashboard();
+  renderDashboard(); // initial render with localStorage data
+  // Re-render after Supabase data is fully merged
+  setTimeout(() => renderDashboard(), 500);
   initChatWelcome();
   updateDbStatus(!S.demo && !!cfg.supabaseUrl);
   loadingBar(100);
