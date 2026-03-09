@@ -710,7 +710,6 @@ async function loadFromSupabase() {
       localStorage.setItem('hh_markers', JSON.stringify(S.markers));
     }
     if (timeline.status === 'fulfilled' && timeline.value?.length) {
-      // Merge DB timeline with local, deduplicate by title+date
       const dbTimeline = timeline.value.map(e => ({...e, desc: e.desc || e.description || ''}));
       const localTimeline = S.timeline || [];
       const merged = [...dbTimeline];
@@ -740,7 +739,6 @@ async function saveMarkerToSupabase(key, value, date) {
 async function saveEventToSupabase(ev) {
   if (!cfg.supabaseUrl || !cfg.supabaseKey || !S.user) return;
   try {
-    // Map local fields to DB columns
     const dbEv = {
       user_id: S.user?.id || S.user?.email || 'anon',
       type: ev.type,
@@ -783,6 +781,7 @@ function setRole(r) {
   document.getElementById('roleDoctor').classList.toggle('active', r === 'doctor');
 }
 
+// FIX: handleAuth declared as regular function so it's hoisted to global scope
 async function handleAuth() {
   const email = document.getElementById('authEmail').value.trim();
   const pass = document.getElementById('authPass').value;
@@ -815,7 +814,7 @@ async function handleAuth() {
     cfg.supabaseKey = data.access_token || cfg.supabaseKey;
     S.user = { id: data.user?.id || data.id || email, email: data.user?.email || email };
     cfg.role = data.user?.user_metadata?.role || selectedRole;
-    cfg.savedUser = S.user;  // persist session
+    cfg.savedUser = S.user;
     S.profile = cfg.role;
     saveConfig();
 
@@ -826,6 +825,7 @@ async function handleAuth() {
   }
 }
 
+// FIX: enterDemoMode declared as regular function so it's hoisted to global scope
 function enterDemoMode() {
   S.demo = true;
   S.user = { id: 'demo', email: 'demo@vitasafe.app' };
@@ -835,7 +835,6 @@ function enterDemoMode() {
 }
 
 async function bootApp() {
-  // Load keys from Vercel environment variables via /api/env
   try {
     const envResp = await fetch('/api/env');
     if (envResp.ok) {
@@ -849,7 +848,6 @@ async function bootApp() {
   loadingBar(40);
   document.getElementById('authScreen').style.display = 'none';
 
-  // Load from localStorage first (fast, offline)
   const savedMarkers = localStorage.getItem('hh_markers');
   if (savedMarkers) { try { S.markers = {...S.markers, ...JSON.parse(savedMarkers)}; } catch(e){} }
   const savedFiles = localStorage.getItem('hh_files');
@@ -865,8 +863,7 @@ async function bootApp() {
   updateSidebarProfile();
   renderNav();
   setupUploadZone();
-  renderDashboard(); // initial render with localStorage data
-  // Re-render after Supabase data is fully merged
+  renderDashboard();
   setTimeout(() => renderDashboard(), 500);
   initChatWelcome();
   updateDbStatus(!S.demo && !!cfg.supabaseUrl);
@@ -1122,19 +1119,17 @@ function renderMarkersTable() {
 
 function renderHealthSummary() {
   const el = document.getElementById('healthSummary');
-  if (!el) return; // element removed from dashboard
+  if (!el) return;
 }
 
 function renderStats() {
   const grid = document.getElementById('statsGrid');
   const bleCount = Object.values(S.bleDevices).filter(d=>d.connected).length;
 
-  // Priority markers for top cards
   const PRIORITY = ['glucose','hemoglobin','cholesterol','pressure_sys','triglycerides','vitamin_d','b12','creatinine','hdl','ldl'];
   const hasMarkers = Object.keys(S.markers).filter(k => S.markers[k]?.length > 0);
   const toShow = [...new Set([...PRIORITY.filter(k=>hasMarkers.includes(k)), ...hasMarkers])].slice(0, 6);
 
-  // Always show wearables card
   const bleCard = `<div class="stat-card purple" onclick="navigate('wearables')">
     <div class="stat-icon">📡</div>
     <div><span class="stat-value">${bleCount}</span></div>
@@ -1148,7 +1143,6 @@ function renderStats() {
     return;
   }
 
-  // Pressure special case
   const cards = toShow.map(k => {
     const meta = MARKER_META[k] || {label:k, unit:'', ref:[0,9999], color:'#7fa5c8'};
     let val, unit;
@@ -1183,7 +1177,6 @@ function showMarkerEvolution(key) {
   title.textContent = `Evolução — ${meta.label}`;
   card.style.display = 'block';
   card.scrollIntoView({behavior:'smooth', block:'start'});
-  // Update chart
   if (mainChart) mainChart.destroy();
   const ctx = document.getElementById('mainChart').getContext('2d');
   const rawData = S.markers[key] || [];
@@ -1294,7 +1287,6 @@ function setupUploadZone() {
   const input = document.getElementById('fileInput');
   if (!zone || !input) return;
 
-  // Remove any existing listeners by cloning elements
   const newZone = zone.cloneNode(true);
   zone.parentNode.replaceChild(newZone, zone);
   const newInput = newZone.querySelector('#fileInput') || document.getElementById('fileInput');
@@ -1307,7 +1299,7 @@ function setupUploadZone() {
     newInput.addEventListener('change', e=>{
       if (e.target.files.length) {
         handleFiles(e.target.files);
-        e.target.value = ''; // reset so same file can be uploaded again
+        e.target.value = '';
       }
     });
   }
@@ -1320,7 +1312,6 @@ async function handleFiles(files) {
     const sizeFmt = sizeKb>1024 ? `${(sizeKb/1024).toFixed(1)} MB` : `${sizeKb.toFixed(0)} KB`;
     const type = file.type.startsWith('image/') ? 'image' : file.type==='application/pdf' ? 'pdf' : 'other';
 
-    // Upload to Supabase Storage
     if (cfg.supabaseUrl && cfg.supabaseKey && !S.demo) {
       try {
         const token = cfg.supabaseToken || cfg.supabaseKey;
@@ -1348,7 +1339,6 @@ async function handleFiles(files) {
       toast(`${file.name} salvo localmente (modo demo)`, 'info');
     }
 
-    // Store local object URL for preview (persists in memory map)
     const localUrl = URL.createObjectURL(file);
     S.blobUrls = S.blobUrls || {};
     S.blobUrls[id] = localUrl;
@@ -1358,12 +1348,10 @@ async function handleFiles(files) {
     S.files.unshift(fileObj);
     renderFiles();
 
-    // AI Extraction — manual only, use the Extrair button
     if ((type==='pdf'||type==='image') && cfg.geminiKey) {
       toast('✅ Arquivo enviado! Clique em 🧬 Extrair para analisar.', 'ok');
     }
   }
-  // Save without blob/localUrl (not serializable)
   const toSave = S.files.map(({localBlob, localUrl, ...rest}) => rest);
   localStorage.setItem('hh_files', JSON.stringify(toSave));
   renderFiles();
@@ -1375,10 +1363,6 @@ async function extractMarkersFromFile(file, fileObj) {
   panel.innerHTML = `<div class="extract-result"><div class="extract-title"><span class="spinner"></span> Extraindo dados com IA de "${fileObj.name}"...</div></div>`;
 
   try {
-    // file content is handled inline below for Gemini
-
-    // Use Gemini with file content
-    // Convert file to base64 text description for the AI
     let fileContext = '';
     if (file.type.startsWith('image/')) {
       fileContext = 'Exame médico em imagem. Extraia todos os marcadores visíveis.';
@@ -1400,7 +1384,6 @@ async function extractMarkersFromFile(file, fileObj) {
       }
     }
     const text = await callGemini(`${EXTRACT_PROMPT}\n\nConteúdo do exame:\n${fileContext}`, 1000);
-    // Remove <think> blocks (reasoning models) and extract JSON
     let jsonStr = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Nenhum JSON na resposta da IA');
@@ -1413,7 +1396,6 @@ async function extractMarkersFromFile(file, fileObj) {
       return;
     }
 
-    // Store fileObj globally for the import button
     window.currentFileObj = fileObj;
 
     panel.innerHTML = `<div class="extract-result">
@@ -1426,7 +1408,6 @@ async function extractMarkersFromFile(file, fileObj) {
       ${extracted.date?`<div style="font-size:11px;color:var(--text3);margin-top:6px;">Data do exame: ${extracted.date}</div>`:''}
     </div>`;
 
-    // Auto-import immediately
     toast('🧬 Marcadores encontrados! Importando automaticamente...', 'success');
     await importExtractedMarkers(extracted, fileObj);
   } catch(e) {
@@ -1451,6 +1432,7 @@ REGRAS IMPORTANTES:
 FORMATO OBRIGATÓRIO:
 {"markers":[{"key":"glucose","name":"Glicose","value":95,"unit":"mg/dL"},{"key":"hemoglobin","name":"Hemoglobina","value":14.1,"unit":"g/dL"}],"date":"2026-01-08","exam_type":"Hemograma"}`;
 
+// FIX: consolidated fIdx — removed duplicate const fIdx2, now using single fIdxMark
 async function importExtractedMarkers(extracted, fileObj) {
   // Prevent duplicate extraction of same file
   const fIdx = S.files.findIndex(x => x.name === fileObj?.name);
@@ -1466,7 +1448,6 @@ async function importExtractedMarkers(extracted, fileObj) {
     const val = parseFloat(m.value);
     if (!key || m.value === null || m.value === undefined || isNaN(val)) continue;
     if (!S.markers[key]) S.markers[key] = [];
-    // Store as {value, date} object for evolution tracking
     S.markers[key].push({ value: val, date: examDate });
     await saveMarkerToSupabase(key, val, examDate);
     count++;
@@ -1478,9 +1459,9 @@ async function importExtractedMarkers(extracted, fileObj) {
     localStorage.setItem('hh_timeline', JSON.stringify(S.timeline));
     await saveEventToSupabase(ev);
   }
-  // Mark file as extracted
-  const fIdx2 = S.files.findIndex(x=>x.name===fileObj?.name);
-  if (fIdx2>=0) S.files[fIdx2].extracted = true;
+  // FIX: use fIdxMark instead of re-declaring fIdx (was causing duplicate const error)
+  const fIdxMark = S.files.findIndex(x => x.name === fileObj?.name);
+  if (fIdxMark >= 0) S.files[fIdxMark].extracted = true;
   document.getElementById('extractionPanel').style.display='none';
   renderDashboard();
   renderFiles();
@@ -1535,14 +1516,12 @@ async function viewFile(id) {
   const f = S.files.find(x=>x.id===id);
   if (!f) return;
 
-  // 1. Try local blob URL first (available right after upload)
   const blobUrl = (S.blobUrls && S.blobUrls[f.id]) || f.localUrl;
   if (blobUrl) {
     window.open(blobUrl, '_blank');
     return;
   }
 
-  // 2. Try signed URL from Supabase Storage
   if (cfg.supabaseUrl && cfg.supabaseKey && !S.demo) {
     try {
       const token = cfg.supabaseToken || cfg.supabaseKey;
@@ -1558,7 +1537,6 @@ async function viewFile(id) {
       });
       if (r.ok) {
         const data = await r.json();
-        // signedURL already contains /storage/v1/object/sign/...
         const signedUrl = data.signedURL.startsWith('http')
           ? data.signedURL
           : `${cfg.supabaseUrl}/storage/v1${data.signedURL}`;
@@ -1571,14 +1549,10 @@ async function viewFile(id) {
     } catch(e) { console.error('Signed URL error:', e); }
   }
 
-  // Last fallback: try direct public/download URL from Supabase
   if (cfg.supabaseUrl && cfg.supabaseKey) {
     const token = cfg.supabaseToken || cfg.supabaseKey;
     const userId = S.user?.id || S.savedUserId || 'shared';
     const storagePath = f.storagePath || `${userId}/${f.id}_${f.name}`;
-    // Try direct download (works if bucket is public or with auth header via redirect)
-    const downloadUrl = `${cfg.supabaseUrl}/storage/v1/object/authenticated/healthhome-records/${storagePath}`;
-    // Open with token in URL as query param
     const signUrl = `${cfg.supabaseUrl}/storage/v1/object/sign/healthhome-records/${storagePath}`;
     try {
       const token2 = cfg.supabaseToken || cfg.supabaseKey;
@@ -1715,7 +1689,6 @@ async function callClaude(prompt, maxTokens=800) {
 
 async function callGemini(prompt, maxTokens=800) {
   if (!cfg.geminiKey) throw new Error('Chave de IA não configurada. Vá em Configurações.');
-  // Try OpenRouter first (free, no regional limits), fallback to Gemini
   const isOpenRouter = cfg.geminiKey.startsWith('sk-or-');
   if (isOpenRouter) {
     const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -1747,7 +1720,6 @@ async function callGemini(prompt, maxTokens=800) {
     if (!r.ok) throw new Error(data.error?.message || 'Erro OpenRouter');
     return data.choices?.[0]?.message?.content || '';
   }
-  // Gemini direct
   const model = cfg.geminiModel || 'gemini-2.0-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.geminiKey}`;
   const r = await fetch(url, {
@@ -1769,7 +1741,6 @@ async function connectBle(deviceId) {
   if (!def) return;
 
   if (!navigator.bluetooth) {
-    // Simulate BLE for demo/non-BLE environments
     toast('Web Bluetooth não disponível. Iniciando simulação...','info');
     startBleSimulation(deviceId, def);
     return;
@@ -1842,23 +1813,19 @@ function handleBleValue(deviceId, def, value) {
   S.bleDevices[deviceId].history.push({ val, time: now });
   if (S.bleDevices[deviceId].history.length > 30) S.bleDevices[deviceId].history.shift();
 
-  // Update UI live
   const valEl = document.getElementById(`bleVal_${deviceId}`);
   const timeEl = document.getElementById(`bleTime_${deviceId}`);
   if (valEl) valEl.textContent = val;
   if (timeEl) timeEl.textContent = `Última leitura: ${now}`;
 
-  // Update marker in state
   const key = def.markerKey;
   if (!S.markers[key]) S.markers[key] = [];
   S.markers[key].push(val);
   if (S.markers[key].length > 50) S.markers[key].shift();
   localStorage.setItem('hh_markers', JSON.stringify(S.markers));
 
-  // Update realtime chart
   updateBleRealtimeChart(def.name, val, now);
 
-  // Update stat card if on dashboard
   if (S.page === 'dashboard') renderStats();
 
   addBleLog(def.name, `${val} ${MARKER_META[key]?.unit||''}`, now);
@@ -1997,7 +1964,6 @@ function renderProntuario() {
       <button class="btn btn-ghost" onclick="openModal('addEventModal')">+ Evento</button>
     </div>`;
 
-  // Vitals
   const vitalsKeys = ['glucose','cholesterol','pressure_sys','pressure_dia','hemoglobin','heart_rate','spo2','triglycerides'];
   document.getElementById('prontuarioVitals').innerHTML = vitalsKeys.map(k=>{
     const meta=MARKER_META[k]; const v=S.markers[k]?.at(-1);
@@ -2010,7 +1976,6 @@ function renderProntuario() {
     </div>`;
   }).filter(Boolean).join('');
 
-  // Prontuario chart
   setTimeout(()=>{
     const canvas = document.getElementById('prontuarioChart');
     if (!canvas||prontuarioChartInst) return;
@@ -2025,7 +1990,6 @@ function renderProntuario() {
     });
   }, 50);
 
-  // History
   document.getElementById('prontuarioTimeline').innerHTML = S.timeline.length
     ? S.timeline.map(it=>{
         const icons={exam:'🔬',consultation:'🩺',prescription:'💊',alert:'⚠️'};
@@ -2041,13 +2005,11 @@ function renderProntuario() {
       }).join('')
     : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Sem histórico</div></div>';
 
-  // Docs
   const docs = S.files.filter(f=>f.patientId===p.id||!f.patientId);
   document.getElementById('prontuarioDocs').innerHTML = docs.length
     ? docs.map(f=>`<div class="file-card"><div class="file-icon">${f.type==='pdf'?'📄':'🖼️'}</div><div class="file-name">${f.name}</div><div class="file-meta">${f.size} · ${f.date}</div></div>`).join('')
     : '<div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">Nenhum documento</div></div>';
 
-  // Notes
   document.getElementById('prontuarioNotes').value = p.notes || '';
 }
 
@@ -2170,10 +2132,16 @@ function loadingBar(pct) {
 // =====================================================
 // INIT
 // =====================================================
+
+// FIX: Expose handleAuth and enterDemoMode to window explicitly.
+// Although declared as regular functions (hoisted), some browsers/strict contexts
+// may not expose them via window.X — this guarantees the HTML inline handlers work.
+window.handleAuth = handleAuth;
+window.enterDemoMode = enterDemoMode;
+
 document.addEventListener('DOMContentLoaded', async () => {
   loadingBar(20);
 
-  // Load env vars from Vercel FIRST before checking auth
   try {
     const envResp = await fetch('/api/env');
     if (envResp.ok) {
@@ -2185,7 +2153,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch(e) { /* fallback to manual config */ }
 
-  // Check for existing session in localStorage
   const savedUser = cfg.savedUser;
   if (savedUser) {
     S.user = savedUser;
