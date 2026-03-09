@@ -725,15 +725,14 @@ async function loadFromSupabase() {
   } catch(e) { console.error('Supabase load:', e); return false; }
 }
 
-async function saveMarkerToSupabase(key, value) {
+async function saveMarkerToSupabase(key, value, date) {
   if (!cfg.supabaseUrl || !cfg.supabaseKey) return;
-  // Save locally always
-  if (!S.markers[key]) S.markers[key] = [];
   try {
-    if (!S.user || S.demo) return; // skip DB in demo mode
+    if (!S.user || S.demo) return;
+    const recorded_at = date ? new Date(date).toISOString() : new Date().toISOString();
     await sbFetch('health_markers', {
       method: 'POST',
-      body: JSON.stringify({ user_id: S.user?.id || S.user?.email || 'anon', marker_key: key, value: parseFloat(value), recorded_at: new Date().toISOString() })
+      body: JSON.stringify({ user_id: S.user?.id || S.user?.email || 'anon', marker_key: key, value: parseFloat(value), recorded_at })
     });
   } catch(e) { console.warn('Save marker to DB failed (saving locally only):', e.message); }
 }
@@ -1086,7 +1085,7 @@ function renderMarkersTable() {
   CATEGORIES[CATEGORIES.length-1].keys = allKeys.filter(k => !categorized.includes(k));
 
   function markerRow(k) {
-    const v = S.markers[k]?.at(-1);
+    const raw = S.markers[k]?.at(-1); const v = typeof raw === 'object' ? raw?.value : raw;
     if (v === undefined || v === null) return '';
     const meta = MARKER_META[k] || { label: k, unit: '', ref: [0, 9999], color: '#7fa5c8' };
     const [lo, hi] = meta.ref;
@@ -1097,10 +1096,11 @@ function renderMarkersTable() {
     const sCls = bad ? 'status-bad' : ok ? 'status-ok' : 'status-warn';
     const sLabel = bad ? 'Atenção' : ok ? 'Normal' : 'Limítrofe';
     const hasHistory = (S.markers[k]?.length || 0) > 1;
+    const lastDate = typeof S.markers[k]?.at(-1) === 'object' ? S.markers[k].at(-1)?.date : null;
     return `<div class="marker-row" style="cursor:pointer;" onclick="showMarkerEvolution('${k}')" title="Ver evolução">
       <div style="flex:1;min-width:80px;">
         <div style="font-size:13px;font-weight:500;">${meta.label} ${hasHistory?'<span style=\"font-size:10px;color:var(--text3);\">('+S.markers[k].length+' registros)</span>':''}</div>
-        <div style="font-size:10px;color:var(--text3);">${lo}–${hi} ${meta.unit}</div>
+        <div style="font-size:10px;color:var(--text3);">${lo}–${hi} ${meta.unit}${lastDate?" · "+new Date(lastDate).toLocaleDateString("pt-BR"):""}</div>
       </div>
       <div class="marker-bar-bg"><div class="marker-bar-fill ${cls}" style="width:${pct}%"></div></div>
       <div style="font-size:15px;font-weight:600;min-width:80px;text-align:right;color:${bad?'var(--danger)':ok?'var(--success)':'var(--warn)'};">${v}<span style="font-size:10px;color:var(--text3);"> ${meta.unit}</span></div>
@@ -1122,17 +1122,7 @@ function renderMarkersTable() {
 
 function renderHealthSummary() {
   const el = document.getElementById('healthSummary');
-  const rows = [
-    {icon:'❤️',label:'Pressão Arterial',val:`${S.markers.pressure_sys?.at(-1)||'—'}/${S.markers.pressure_dia?.at(-1)||'—'} mmHg`},
-    {icon:'💉',label:'Glicemia em Jejum',val:`${S.markers.glucose?.at(-1)||'—'} mg/dL`},
-    {icon:'🧬',label:'Colesterol Total',val:`${S.markers.cholesterol?.at(-1)||'—'} mg/dL`},
-    {icon:'🫁',label:'SpO2',val:`${S.markers.spo2?.at(-1)||'—'} %`},
-    {icon:'💓',label:'Freq. Cardíaca',val:`${S.markers.heart_rate?.at(-1)||'—'} bpm`},
-    {icon:'📋',label:'Eventos Registrados',val:`${S.timeline.length}`},
-  ];
-  el.innerHTML = rows.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-    <span style="font-size:18px;">${r.icon}</span><span style="flex:1;font-size:13px;color:var(--text2);">${r.label}</span>
-    <span style="font-size:13px;font-weight:500;">${r.val}</span></div>`).join('');
+  if (!el) return; // element removed from dashboard
 }
 
 function renderStats() {
@@ -1166,7 +1156,7 @@ function renderStats() {
       val = `${S.markers.pressure_sys?.at(-1)||'—'}/${S.markers.pressure_dia?.at(-1)||'—'}`;
       unit = 'mmHg';
     } else {
-      val = S.markers[k]?.at(-1) ?? '—';
+      const _r = S.markers[k]?.at(-1); val = (typeof _r === 'object' ? _r?.value : _r) ?? '—';
       unit = meta.unit;
     }
     const [lo,hi] = meta.ref;
@@ -1196,8 +1186,9 @@ function showMarkerEvolution(key) {
   // Update chart
   if (mainChart) mainChart.destroy();
   const ctx = document.getElementById('mainChart').getContext('2d');
-  const data = S.markers[key] || [];
-  const labels = data.map((_,i) => `#${i+1}`);
+  const rawData = S.markers[key] || [];
+  const data = rawData.map(d => typeof d === 'object' ? d.value : d);
+  const labels = rawData.map((d,i) => typeof d === 'object' && d.date ? new Date(d.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : `#${i+1}`);
   const color = meta.color || '#2dd4bf';
   const g = ctx.createLinearGradient(0,0,0,220);
   g.addColorStop(0, color+'38'); g.addColorStop(1, color+'00');
@@ -1461,14 +1452,23 @@ FORMATO OBRIGATÓRIO:
 {"markers":[{"key":"glucose","name":"Glicose","value":95,"unit":"mg/dL"},{"key":"hemoglobin","name":"Hemoglobina","value":14.1,"unit":"g/dL"}],"date":"2026-01-08","exam_type":"Hemograma"}`;
 
 async function importExtractedMarkers(extracted, fileObj) {
+  // Prevent duplicate extraction of same file
+  const fIdx = S.files.findIndex(x => x.name === fileObj?.name);
+  if (fIdx >= 0 && S.files[fIdx].extracted) {
+    toast('⚠️ Este arquivo já foi extraído anteriormente.', 'warn');
+    return;
+  }
+
   let count = 0;
+  const examDate = extracted.date || new Date().toISOString().slice(0,10);
   for (const m of extracted.markers) {
     const key = m.key;
     const val = parseFloat(m.value);
-    if (!key || m.value === null || m.value === undefined || isNaN(val)) continue; // skip invalid
+    if (!key || m.value === null || m.value === undefined || isNaN(val)) continue;
     if (!S.markers[key]) S.markers[key] = [];
-    S.markers[key].push(val);
-    await saveMarkerToSupabase(key, val);
+    // Store as {value, date} object for evolution tracking
+    S.markers[key].push({ value: val, date: examDate });
+    await saveMarkerToSupabase(key, val, examDate);
     count++;
   }
   localStorage.setItem('hh_markers', JSON.stringify(S.markers));
