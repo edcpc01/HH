@@ -983,40 +983,111 @@ function openAddMarker() { openModal('addMarkerModal'); }
 let mainChart, radarChart, prontuarioChartInst, bleRTChart;
 
 const MARKER_META = {
-  glucose:       {label:'Glicose',        unit:'mg/dL', ref:[70,99],    color:'#2dd4bf'},
-  cholesterol:   {label:'Colesterol',     unit:'mg/dL', ref:[0,199],    color:'#38bdf8'},
-  pressure_sys:  {label:'P.Sistólica',    unit:'mmHg',  ref:[90,130],   color:'#fb7185'},
-  pressure_dia:  {label:'P.Diastólica',   unit:'mmHg',  ref:[60,85],    color:'#f472b6'},
-  hemoglobin:    {label:'Hemoglobina',    unit:'g/dL',  ref:[12,17],    color:'#fbbf24'},
-  triglycerides: {label:'Triglicerídeos', unit:'mg/dL', ref:[0,150],    color:'#a78bfa'},
-  heart_rate:    {label:'Freq.Cardíaca',  unit:'bpm',   ref:[60,100],   color:'#34d399'},
-  spo2:          {label:'SpO2',           unit:'%',     ref:[95,100],   color:'#60a5fa'},
-  hdl:           {label:'HDL',            unit:'mg/dL', ref:[40,999],   color:'#34d399'},
-  ldl:           {label:'LDL',            unit:'mg/dL', ref:[0,130],    color:'#f472b6'},
-  hematocrit:    {label:'Hematócrito',    unit:'%',     ref:[36,50],    color:'#fb923c'},
-  leukocytes:    {label:'Leucócitos',     unit:'%',     ref:[4,11],     color:'#818cf8'},
-  platelets:     {label:'Plaquetas',      unit:'/µL',   ref:[150000,400000], color:'#e879f9'},
-  creatinine:    {label:'Creatinina',     unit:'mg/dL', ref:[0.5,1.2],  color:'#22d3ee'},
-  urea:          {label:'Ureia',          unit:'mg/dL', ref:[10,50],    color:'#4ade80'},
-  tsh:           {label:'TSH',            unit:'µUI/mL',ref:[0.4,4.0],  color:'#facc15'},
-  t4:            {label:'T4 Livre',       unit:'ng/dL', ref:[0.8,1.8],  color:'#fb7185'},
-  ferritin:      {label:'Ferritina',      unit:'ng/mL', ref:[12,300],   color:'#f97316'},
-  vitamin_d:     {label:'Vitamina D',     unit:'ng/mL', ref:[30,100],   color:'#fbbf24'},
-  b12:           {label:'Vitamina B12',   unit:'pg/mL', ref:[200,900],  color:'#a3e635'},
-  uric_acid:     {label:'Ácido Úrico',    unit:'mg/dL', ref:[2.4,7.0],  color:'#38bdf8'},
-  erythrocytes:  {label:'Eritrócitos',    unit:'10⁶/µL',ref:[4.0,6.0],  color:'#f87171'},
-  vcm:           {label:'VCM',            unit:'fL',    ref:[80,100],   color:'#c084fc'},
-  hcm:           {label:'HCM',            unit:'pg',    ref:[27,33],    color:'#67e8f9'},
-  chcm:          {label:'CHCM',           unit:'g/dL',  ref:[32,36],    color:'#86efac'},
-  rdw:           {label:'RDW',            unit:'%',     ref:[11,15],    color:'#fcd34d'},
-  hba1c:         {label:'HbA1c',           unit:'%',     ref:[0,5.7],    color:'#f87171'},
-  avg_glucose:   {label:'Glicose Média Est.',unit:'mg/dL',ref:[70,126],   color:'#fb923c'},
-  egfr:          {label:'TFG/EGFR',         unit:'mL/min',ref:[60,999],   color:'#67e8f9'},
-  neutrophils:   {label:'Neutrófilos',      unit:'/µL',   ref:[1800,7700],color:'#a3e635'},
-  lymphocytes:   {label:'Linfócitos',       unit:'/µL',   ref:[1000,4800],color:'#34d399'},
-  monocytes:     {label:'Monócitos',        unit:'/µL',   ref:[200,1000], color:'#fbbf24'},
-  eosinophils:   {label:'Eosinófilos',      unit:'/µL',   ref:[100,500],  color:'#f472b6'},
-  basophils:     {label:'Basófilos',        unit:'/µL',   ref:[0,100],    color:'#818cf8'},
+  // --- Glicose ---
+  glucose:                {label:'Glicose',              unit:'mg/dL',  ref:[70,99],       color:'#2dd4bf'},
+  hba1c:                  {label:'HbA1c',                unit:'%',      ref:[0,5.7],       color:'#f87171'},
+  hemoglobin_glycated:    {label:'Hb Glicada',           unit:'%',      ref:[0,5.7],       color:'#f87171'},
+  avg_glucose:            {label:'Glicose Média Est.',   unit:'mg/dL',  ref:[70,126],      color:'#fb923c'},
+  estimated_average_glucose:{label:'Glicose Média Est.', unit:'mg/dL', ref:[70,126],      color:'#fb923c'},
+  fasting_glucose:        {label:'Glicemia Jejum',       unit:'mg/dL',  ref:[70,99],       color:'#2dd4bf'},
+  insulin:                {label:'Insulina',             unit:'µUI/mL', ref:[2,25],        color:'#a78bfa'},
+  homa_ir:                {label:'HOMA-IR',              unit:'',       ref:[0,2.7],       color:'#e879f9'},
+  // --- Lipídios ---
+  cholesterol:            {label:'Colesterol Total',     unit:'mg/dL',  ref:[0,199],       color:'#38bdf8'},
+  hdl:                    {label:'HDL',                  unit:'mg/dL',  ref:[40,999],      color:'#34d399'},
+  ldl:                    {label:'LDL',                  unit:'mg/dL',  ref:[0,130],       color:'#f472b6'},
+  vldl:                   {label:'VLDL',                 unit:'mg/dL',  ref:[0,30],        color:'#818cf8'},
+  triglycerides:          {label:'Triglicerídeos',       unit:'mg/dL',  ref:[0,150],       color:'#a78bfa'},
+  non_hdl:                {label:'Colesterol não-HDL',   unit:'mg/dL',  ref:[0,160],       color:'#c084fc'},
+  // --- Hemograma Série Vermelha ---
+  erythrocytes:           {label:'Eritrócitos',          unit:'10⁶/µL', ref:[4.0,6.0],     color:'#f87171'},
+  hemoglobin:             {label:'Hemoglobina',          unit:'g/dL',   ref:[12,17],       color:'#fbbf24'},
+  hematocrit:             {label:'Hematócrito',          unit:'%',      ref:[36,50],       color:'#fb923c'},
+  vcm:                    {label:'VCM',                  unit:'fL',     ref:[80,100],      color:'#c084fc'},
+  hcm:                    {label:'HCM',                  unit:'pg',     ref:[27,33],       color:'#67e8f9'},
+  chcm:                   {label:'CHCM',                 unit:'g/dL',   ref:[32,36],       color:'#86efac'},
+  rdw:                    {label:'RDW',                  unit:'%',      ref:[11,15],       color:'#fcd34d'},
+  // --- Hemograma Série Branca ---
+  leukocytes:             {label:'Leucócitos',           unit:'/µL',    ref:[4000,11000],  color:'#818cf8'},
+  neutrophils:            {label:'Neutrófilos',          unit:'/µL',    ref:[1800,7700],   color:'#a3e635'},
+  lymphocytes:            {label:'Linfócitos',           unit:'/µL',    ref:[1000,4800],   color:'#34d399'},
+  monocytes:              {label:'Monócitos',            unit:'/µL',    ref:[200,1000],    color:'#fbbf24'},
+  eosinophils:            {label:'Eosinófilos',          unit:'/µL',    ref:[100,500],     color:'#f472b6'},
+  basophils:              {label:'Basófilos',            unit:'/µL',    ref:[0,100],       color:'#818cf8'},
+  platelets:              {label:'Plaquetas',            unit:'/µL',    ref:[150000,400000],color:'#e879f9'},
+  // --- Função Renal ---
+  creatinine:             {label:'Creatinina',           unit:'mg/dL',  ref:[0.5,1.2],     color:'#22d3ee'},
+  urea:                   {label:'Ureia',                unit:'mg/dL',  ref:[10,50],       color:'#4ade80'},
+  egfr:                   {label:'TFG/eGFR',             unit:'mL/min', ref:[60,999],      color:'#67e8f9'},
+  uric_acid:              {label:'Ácido Úrico',          unit:'mg/dL',  ref:[2.4,7.0],     color:'#38bdf8'},
+  microalbumin:           {label:'Microalbuminúria',     unit:'mg/g',   ref:[0,30],        color:'#fb923c'},
+  // --- Função Hepática ---
+  ast:                    {label:'AST/TGO',              unit:'U/L',    ref:[0,40],        color:'#f97316'},
+  alt:                    {label:'ALT/TGP',              unit:'U/L',    ref:[0,41],        color:'#fb923c'},
+  ggt:                    {label:'GGT',                  unit:'U/L',    ref:[0,61],        color:'#fbbf24'},
+  alkaline_phosphatase:   {label:'Fosfatase Alcalina',   unit:'U/L',    ref:[40,150],      color:'#facc15'},
+  total_bilirubin:        {label:'Bilirrubina Total',    unit:'mg/dL',  ref:[0,1.2],       color:'#fde68a'},
+  direct_bilirubin:       {label:'Bilirrubina Direta',   unit:'mg/dL',  ref:[0,0.4],       color:'#fef08a'},
+  indirect_bilirubin:     {label:'Bilirrubina Indireta', unit:'mg/dL',  ref:[0,0.8],       color:'#fef9c3'},
+  albumin:                {label:'Albumina',             unit:'g/dL',   ref:[3.5,5.5],     color:'#d9f99d'},
+  total_protein:          {label:'Proteínas Totais',     unit:'g/dL',   ref:[6.0,8.0],     color:'#bbf7d0'},
+  // --- Tireoide ---
+  tsh:                    {label:'TSH',                  unit:'µUI/mL', ref:[0.4,4.0],     color:'#facc15'},
+  t4:                     {label:'T4 Livre',             unit:'ng/dL',  ref:[0.8,1.8],     color:'#fb7185'},
+  t3:                     {label:'T3 Livre',             unit:'pg/mL',  ref:[2.3,4.2],     color:'#f472b6'},
+  t4_total:               {label:'T4 Total',             unit:'µg/dL',  ref:[5.0,12.0],    color:'#fda4af'},
+  t3_total:               {label:'T3 Total',             unit:'ng/dL',  ref:[80,200],      color:'#fbcfe8'},
+  anti_tpo:               {label:'Anti-TPO',             unit:'UI/mL',  ref:[0,35],        color:'#f9a8d4'},
+  // --- Vitaminas & Minerais ---
+  vitamin_d:              {label:'Vitamina D',           unit:'ng/mL',  ref:[30,100],      color:'#fbbf24'},
+  b12:                    {label:'Vitamina B12',         unit:'pg/mL',  ref:[200,900],     color:'#a3e635'},
+  vitamin_b12:            {label:'Vitamina B12',         unit:'pg/mL',  ref:[200,900],     color:'#a3e635'},
+  folate:                 {label:'Folato/Ácido Fólico',  unit:'ng/mL',  ref:[3,17],        color:'#86efac'},
+  ferritin:               {label:'Ferritina',            unit:'ng/mL',  ref:[12,300],      color:'#f97316'},
+  iron:                   {label:'Ferro Sérico',         unit:'µg/dL',  ref:[60,170],      color:'#fb923c'},
+  tibc:                   {label:'TIBC',                 unit:'µg/dL',  ref:[250,370],     color:'#fdba74'},
+  transferrin_sat:        {label:'Sat. Transferrina',    unit:'%',      ref:[20,50],       color:'#fcd34d'},
+  calcium:                {label:'Cálcio',               unit:'mg/dL',  ref:[8.5,10.5],    color:'#e2e8f0'},
+  magnesium:              {label:'Magnésio',             unit:'mg/dL',  ref:[1.6,2.6],     color:'#cbd5e1'},
+  phosphorus:             {label:'Fósforo',              unit:'mg/dL',  ref:[2.5,4.5],     color:'#94a3b8'},
+  zinc:                   {label:'Zinco',                unit:'µg/dL',  ref:[70,120],      color:'#7dd3fc'},
+  // --- Próstata & Oncologia ---
+  psa_total:              {label:'PSA Total',            unit:'ng/mL',  ref:[0,4.0],       color:'#60a5fa'},
+  psa_free:               {label:'PSA Livre',            unit:'ng/mL',  ref:[0,4.0],       color:'#93c5fd'},
+  psa_ratio:              {label:'PSA Livre/Total',      unit:'%',      ref:[15,100],      color:'#bfdbfe'},
+  cea:                    {label:'CEA',                  unit:'ng/mL',  ref:[0,3.4],       color:'#c4b5fd'},
+  ca125:                  {label:'CA-125',               unit:'U/mL',   ref:[0,35],        color:'#ddd6fe'},
+  ca199:                  {label:'CA 19-9',              unit:'U/mL',   ref:[0,37],        color:'#ede9fe'},
+  afp:                    {label:'AFP',                  unit:'ng/mL',  ref:[0,10],        color:'#f3e8ff'},
+  // --- Cardiovascular ---
+  pressure_sys:           {label:'P.Sistólica',          unit:'mmHg',   ref:[90,130],      color:'#fb7185'},
+  pressure_dia:           {label:'P.Diastólica',         unit:'mmHg',   ref:[60,85],       color:'#f472b6'},
+  heart_rate:             {label:'Freq.Cardíaca',        unit:'bpm',    ref:[60,100],      color:'#34d399'},
+  spo2:                   {label:'SpO2',                 unit:'%',      ref:[95,100],      color:'#60a5fa'},
+  crp:                    {label:'PCR',                  unit:'mg/L',   ref:[0,5],         color:'#fca5a5'},
+  crp_ultra:              {label:'PCR Ultrassensível',   unit:'mg/L',   ref:[0,1],         color:'#f87171'},
+  homocysteine:           {label:'Homocisteína',         unit:'µmol/L', ref:[0,15],        color:'#fda4af'},
+  fibrinogen:             {label:'Fibrinogênio',         unit:'mg/dL',  ref:[200,400],     color:'#fecaca'},
+  // --- Hormônios Sexuais ---
+  testosterone:           {label:'Testosterona Total',   unit:'ng/dL',  ref:[300,1000],    color:'#6ee7b7'},
+  testosterone_free:      {label:'Testosterona Livre',   unit:'pg/mL',  ref:[5,21],        color:'#a7f3d0'},
+  lh:                     {label:'LH',                   unit:'mUI/mL', ref:[1,9],         color:'#34d399'},
+  fsh:                    {label:'FSH',                  unit:'mUI/mL', ref:[1,12],        color:'#6ee7b7'},
+  estradiol:              {label:'Estradiol',            unit:'pg/mL',  ref:[20,400],      color:'#f9a8d4'},
+  progesterone:           {label:'Progesterona',         unit:'ng/mL',  ref:[0.1,25],      color:'#fbcfe8'},
+  prolactin:              {label:'Prolactina',           unit:'ng/mL',  ref:[2,30],        color:'#fce7f3'},
+  dheas:                  {label:'DHEA-S',               unit:'µg/dL',  ref:[80,560],      color:'#fdf4ff'},
+  cortisol:               {label:'Cortisol',             unit:'µg/dL',  ref:[6,23],        color:'#fef9c3'},
+  // --- Imuno & Inflamação ---
+  ige:                    {label:'IgE Total',            unit:'UI/mL',  ref:[0,100],       color:'#fde68a'},
+  ana:                    {label:'FAN/ANA',              unit:'',       ref:[0,1],         color:'#fef08a'},
+  vhs:                    {label:'VHS',                  unit:'mm/h',   ref:[0,20],        color:'#fef3c7'},
+  // --- Outros comuns ---
+  sodium:                 {label:'Sódio',                unit:'mEq/L',  ref:[136,145],     color:'#bae6fd'},
+  potassium:              {label:'Potássio',             unit:'mEq/L',  ref:[3.5,5.0],     color:'#7dd3fc'},
+  chloride:               {label:'Cloro',                unit:'mEq/L',  ref:[98,107],      color:'#67e8f9'},
+  bicarbonate:            {label:'Bicarbonato',          unit:'mEq/L',  ref:[22,29],       color:'#a5f3fc'},
+  glucose_2h:             {label:'Glicose 2h (TOTG)',   unit:'mg/dL',  ref:[0,140],       color:'#5eead4'},
 };
 
 function chartDefaults(ctx, color) {
@@ -1068,13 +1139,19 @@ function renderMarkersTable() {
   if (!el) return;
 
   const CATEGORIES = [
-    { label: '🔴 Série Vermelha', keys: ['erythrocytes','hemoglobin','hematocrit','vcm','hcm','chcm','rdw'] },
-    { label: '⚪ Série Branca', keys: ['leukocytes','neutrophils','lymphocytes','monocytes','eosinophils','basophils','platelets'] },
-    { label: '🍬 Glicose', keys: ['glucose','hba1c','avg_glucose'] },
-    { label: '🫀 Colesterol', keys: ['cholesterol','hdl','ldl','triglycerides'] },
-    { label: '🫘 Função Renal', keys: ['creatinine','urea','egfr','uric_acid'] },
-    { label: '💊 Vitaminas & Hormônios', keys: ['vitamin_d','b12','ferritin','tsh','t4'] },
-    { label: '📊 Outros', keys: [] },
+    { label: '🍬 Glicose & Diabetes',   keys: ['glucose','fasting_glucose','hba1c','hemoglobin_glycated','avg_glucose','estimated_average_glucose','glucose_2h','insulin','homa_ir'] },
+    { label: '🫀 Lipídios',             keys: ['cholesterol','hdl','ldl','vldl','non_hdl','triglycerides'] },
+    { label: '🔴 Série Vermelha',       keys: ['erythrocytes','hemoglobin','hematocrit','vcm','hcm','chcm','rdw'] },
+    { label: '⚪ Série Branca',         keys: ['leukocytes','neutrophils','lymphocytes','monocytes','eosinophils','basophils','platelets'] },
+    { label: '🫘 Função Renal',         keys: ['creatinine','urea','egfr','uric_acid','microalbumin'] },
+    { label: '🫁 Função Hepática',      keys: ['ast','alt','ggt','alkaline_phosphatase','total_bilirubin','direct_bilirubin','indirect_bilirubin','albumin','total_protein'] },
+    { label: '🦋 Tireoide',             keys: ['tsh','t4','t3','t4_total','t3_total','anti_tpo'] },
+    { label: '💊 Vitaminas & Minerais', keys: ['vitamin_d','b12','vitamin_b12','folate','ferritin','iron','tibc','transferrin_sat','calcium','magnesium','phosphorus','zinc'] },
+    { label: '🔬 Próstata & Oncologia', keys: ['psa_total','psa_free','psa_ratio','cea','ca125','ca199','afp'] },
+    { label: '❤️ Cardiovascular',       keys: ['pressure_sys','pressure_dia','heart_rate','spo2','crp','crp_ultra','homocysteine','fibrinogen'] },
+    { label: '⚗️ Hormônios',            keys: ['testosterone','testosterone_free','lh','fsh','estradiol','progesterone','prolactin','dheas','cortisol'] },
+    { label: '🧪 Eletrólitos',          keys: ['sodium','potassium','chloride','bicarbonate'] },
+    { label: '📊 Outros',              keys: [] },
   ];
 
   const categorized = CATEGORIES.flatMap(c => c.keys);
@@ -1458,22 +1535,69 @@ async function extractMarkersFromFile(file, fileObj) {
   }
 }
 
-const EXTRACT_PROMPT = `Você é um especialista em análise de exames laboratoriais. Analise o texto do exame abaixo e extraia TODOS os marcadores de saúde encontrados.
+const EXTRACT_PROMPT = `Você é um especialista em análise de exames laboratoriais brasileiros. Analise o texto do exame abaixo e extraia TODOS os marcadores de saúde encontrados.
 
 REGRAS IMPORTANTES:
 - Extraia TODOS os valores numéricos que forem marcadores de saúde
-- Use EXATAMENTE as keys abaixo quando o marcador corresponder:
-  glucose (Glicose/Glicemia), cholesterol (Colesterol Total), pressure_sys (Pressão Sistólica),
-  pressure_dia (Pressão Diastólica), hemoglobin (Hemoglobina), triglycerides (Triglicerídeos),
-  heart_rate (Frequência Cardíaca), spo2 (Saturação O2/SpO2), hdl (HDL), ldl (LDL),
-  hematocrit (Hematócrito), leukocytes (Leucócitos), platelets (Plaquetas),
-  creatinine (Creatinina), urea (Ureia), tsh (TSH), t4 (T4 Livre), ferritin (Ferritina),
-  vitamin_d (Vitamina D), b12 (Vitamina B12), uric_acid (Ácido Úrico)
-- Para marcadores não listados acima, crie uma key em snake_case
+- Use EXATAMENTE as keys abaixo quando o marcador corresponder (mapeie sinônimos corretamente):
+
+GLICOSE/DIABETES:
+  glucose (Glicose/Glicemia jejum), hba1c (HbA1c/Hemoglobina Glicada %),
+  hemoglobin_glycated (Hb Glicada quando em %), estimated_average_glucose (Glicose Média Estimada/eAG),
+  fasting_glucose (Glicemia de Jejum), insulin (Insulina), homa_ir (HOMA-IR), glucose_2h (Glicose 2h TOTG)
+
+LIPÍDIOS:
+  cholesterol (Colesterol Total), hdl (HDL), ldl (LDL), vldl (VLDL),
+  triglycerides (Triglicerídeos/Triglicérides), non_hdl (Colesterol não-HDL)
+
+HEMOGRAMA SÉRIE VERMELHA:
+  erythrocytes (Eritrócitos/Hemácias), hemoglobin (Hemoglobina g/dL), hematocrit (Hematócrito),
+  vcm (VCM), hcm (HCM), chcm (CHCM), rdw (RDW)
+
+HEMOGRAMA SÉRIE BRANCA:
+  leukocytes (Leucócitos total), neutrophils (Neutrófilos absolutos),
+  lymphocytes (Linfócitos absolutos), monocytes (Monócitos absolutos),
+  eosinophils (Eosinófilos absolutos), basophils (Basófilos absolutos), platelets (Plaquetas)
+
+FUNÇÃO RENAL:
+  creatinine (Creatinina), urea (Ureia), egfr (TFG/eGFR/MDRD), uric_acid (Ácido Úrico), microalbumin (Microalbuminúria)
+
+FUNÇÃO HEPÁTICA:
+  ast (AST/TGO), alt (ALT/TGP), ggt (GGT/Gama-GT), alkaline_phosphatase (Fosfatase Alcalina),
+  total_bilirubin (Bilirrubina Total), direct_bilirubin (Bilirrubina Direta),
+  indirect_bilirubin (Bilirrubina Indireta), albumin (Albumina), total_protein (Proteínas Totais)
+
+TIREOIDE:
+  tsh (TSH), t4 (T4 Livre/FT4), t3 (T3 Livre/FT3), t4_total (T4 Total), t3_total (T3 Total), anti_tpo (Anti-TPO)
+
+VITAMINAS & MINERAIS:
+  vitamin_d (Vitamina D/25-OH), vitamin_b12 (Vitamina B12/Cobalamina), folate (Folato/Ácido Fólico),
+  ferritin (Ferritina), iron (Ferro Sérico), tibc (TIBC/Capacidade Ligação Ferro),
+  transferrin_sat (Saturação Transferrina), calcium (Cálcio), magnesium (Magnésio),
+  phosphorus (Fósforo), zinc (Zinco)
+
+PRÓSTATA & ONCOLOGIA:
+  psa_total (PSA Total), psa_free (PSA Livre), psa_ratio (Relação PSA Livre/Total),
+  cea (CEA/Antígeno Carcinoembrio), ca125 (CA-125), ca199 (CA 19-9), afp (AFP/Alfa-fetoproteína)
+
+CARDIOVASCULAR:
+  crp (PCR/Proteína C Reativa), crp_ultra (PCR Ultrassensível), homocysteine (Homocisteína), fibrinogen (Fibrinogênio)
+
+HORMÔNIOS:
+  testosterone (Testosterona Total), testosterone_free (Testosterona Livre),
+  lh (LH), fsh (FSH), estradiol (Estradiol), progesterone (Progesterona),
+  prolactin (Prolactina), dheas (DHEA-S), cortisol (Cortisol)
+
+ELETRÓLITOS:
+  sodium (Sódio/Na), potassium (Potássio/K), chloride (Cloro/Cl), bicarbonate (Bicarbonato)
+
+- Para marcadores NÃO listados acima, crie uma key em snake_case
 - Responda APENAS com JSON válido, sem texto antes ou depois
+- Extraia a DATA do exame no formato YYYY-MM-DD
+- Se houver valores percentuais E absolutos do diferencial leucocitário, prefira os ABSOLUTOS (/µL)
 
 FORMATO OBRIGATÓRIO:
-{"markers":[{"key":"glucose","name":"Glicose","value":95,"unit":"mg/dL"},{"key":"hemoglobin","name":"Hemoglobina","value":14.1,"unit":"g/dL"}],"date":"2026-01-08","exam_type":"Hemograma"}`;
+{"markers":[{"key":"glucose","name":"Glicose","value":95,"unit":"mg/dL"},{"key":"hemoglobin","name":"Hemoglobina","value":14.1,"unit":"g/dL"},{"key":"psa_total","name":"PSA Total","value":0.6,"unit":"ng/mL"}],"date":"2025-09-27","exam_type":"Hemograma Completo"}`;
 
 // FIX: consolidated fIdx — removed duplicate const fIdx2, now using single fIdxMark
 async function importExtractedMarkers(extracted, fileObj) {
