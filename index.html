@@ -1119,6 +1119,21 @@ const MARKER_META = {
   chloride:               {label:'Cloro',                unit:'mEq/L',  ref:[98,107],      color:'#67e8f9'},
   bicarbonate:            {label:'Bicarbonato',          unit:'mEq/L',  ref:[22,29],       color:'#a5f3fc'},
   glucose_2h:             {label:'Glicose 2h (TOTG)',   unit:'mg/dL',  ref:[0,140],       color:'#5eead4'},
+  // --- Adicionais comuns em laudos brasileiros ---
+  vpm:                    {label:'VPM',                  unit:'fL',     ref:[8.3,12.5],    color:'#c084fc'},
+  cpk:                    {label:'CPK/CK',               unit:'U/L',    ref:[39,308],      color:'#f87171'},
+  ck_mb:                  {label:'CK-MB',                unit:'U/L',    ref:[0,25],        color:'#fca5a5'},
+  ldh:                    {label:'DHL/LDH',              unit:'U/L',    ref:[120,246],     color:'#fb923c'},
+  ggt:                    {label:'GGT',                  unit:'U/L',    ref:[0,61],        color:'#fbbf24'},
+  bilirubin_total:        {label:'Bilirrubina Total',    unit:'mg/dL',  ref:[0,1.2],       color:'#fde68a'},
+  bilirubin_direct:       {label:'Bilirrubina Direta',   unit:'mg/dL',  ref:[0,0.4],       color:'#fef08a'},
+  bilirubin_indirect:     {label:'Bilirrubina Indireta', unit:'mg/dL',  ref:[0,0.8],       color:'#fef9c3'},
+  urine_density:          {label:'Urina - Densidade',    unit:'',       ref:[1005,1035],   color:'#94a3b8'},
+  urine_ph:               {label:'Urina - pH',           unit:'',       ref:[4.5,7.5],     color:'#cbd5e1'},
+  urine_leukocytes:       {label:'Urina - Leucócitos',   unit:'/mL',    ref:[0,25000],     color:'#fca5a5'},
+  urine_erythrocytes:     {label:'Urina - Hemácias',     unit:'/mL',    ref:[0,23000],     color:'#fda4af'},
+  reticulocytes:          {label:'Reticulócitos',        unit:'%',      ref:[0.5,2.0],     color:'#86efac'},
+  immature_granulocytes:  {label:'Granulócitos Imaturos',unit:'%',      ref:[0,0.5],       color:'#d9f99d'},
 };
 
 function chartDefaults(ctx, color) {
@@ -1172,10 +1187,10 @@ function renderMarkersTable() {
   const CATEGORIES = [
     { label: '🍬 Glicose & Diabetes',   keys: ['glucose','fasting_glucose','hba1c','hemoglobin_glycated','avg_glucose','estimated_average_glucose','glucose_2h','insulin','homa_ir'] },
     { label: '🫀 Lipídios',             keys: ['cholesterol','hdl','ldl','vldl','non_hdl','triglycerides'] },
-    { label: '🔴 Série Vermelha',       keys: ['erythrocytes','hemoglobin','hematocrit','vcm','hcm','chcm','rdw'] },
-    { label: '⚪ Série Branca',         keys: ['leukocytes','neutrophils','lymphocytes','monocytes','eosinophils','basophils','platelets'] },
+    { label: '🔴 Série Vermelha',       keys: ['erythrocytes','hemoglobin','hematocrit','vcm','hcm','chcm','rdw','reticulocytes','immature_granulocytes'] },
+    { label: '⚪ Série Branca',         keys: ['leukocytes','neutrophils','lymphocytes','monocytes','eosinophils','basophils','platelets','vpm'] },
     { label: '🫘 Função Renal',         keys: ['creatinine','urea','egfr','uric_acid','microalbumin'] },
-    { label: '🫁 Função Hepática',      keys: ['ast','alt','ggt','alkaline_phosphatase','total_bilirubin','direct_bilirubin','indirect_bilirubin','albumin','total_protein'] },
+    { label: '🫁 Função Hepática',      keys: ['ast','alt','ggt','alkaline_phosphatase','total_bilirubin','direct_bilirubin','indirect_bilirubin','bilirubin_total','bilirubin_direct','bilirubin_indirect','albumin','total_protein','cpk','ck_mb','ldh'] },
     { label: '🦋 Tireoide',             keys: ['tsh','t4','t3','t4_total','t3_total','anti_tpo'] },
     { label: '💊 Vitaminas & Minerais', keys: ['vitamin_d','b12','vitamin_b12','folate','ferritin','iron','tibc','transferrin_sat','calcium','magnesium','phosphorus','zinc'] },
     { label: '🔬 Próstata & Oncologia', keys: ['psa_total','psa_free','psa_ratio','cea','ca125','ca199','afp'] },
@@ -1600,78 +1615,90 @@ async function extractMarkersFromFile(file, fileObj) {
   }
 }
 
-const EXTRACT_PROMPT = `Você é um especialista em análise de exames laboratoriais brasileiros. Analise o texto do exame abaixo e extraia TODOS os marcadores de saúde encontrados.
+const EXTRACT_PROMPT = `Você é um especialista em análise de exames laboratoriais brasileiros (Previlab, DASA, Fleury, Lavoisier, Hermes Pardini, etc.).
 
-REGRAS IMPORTANTES:
-- Extraia TODOS os valores numéricos que forem marcadores de saúde
-- Use EXATAMENTE as keys abaixo quando o marcador corresponder (mapeie sinônimos corretamente):
+TAREFA: Extraia APENAS os valores do exame atual. NÃO extraia valores de gráficos de histórico.
 
-GLICOSE/DIABETES:
-  glucose (Glicose/Glicemia jejum), hba1c (HbA1c/Hemoglobina Glicada %),
-  hemoglobin_glycated (Hb Glicada quando em %), estimated_average_glucose (Glicose Média Estimada/eAG),
-  fasting_glucose (Glicemia de Jejum), insulin (Insulina), homa_ir (HOMA-IR), glucose_2h (Glicose 2h TOTG)
+REGRA CRÍTICA — DATA DO EXAME:
+- Procure por "DATA COLETA/RECEBIMENTO:", "Data da Coleta:", "Data Coleta:", "Data do Exame:"
+- Extraia a data nesse formato e converta para YYYY-MM-DD
+- Exemplo: "08/01/2026 07:11" → "2026-01-08"
 
-LIPÍDIOS:
-  cholesterol (Colesterol Total), hdl (HDL), ldl (LDL), vldl (VLDL),
-  triglycerides (Triglicerídeos/Triglicérides), non_hdl (Colesterol não-HDL)
+REGRA CRÍTICA — VALORES CORRETOS:
+- Para cada exame, extraia SOMENTE o valor mais recente (resultado atual)
+- IGNORE completamente seções "Gráfico de Histórico" e os valores históricos listados abaixo deles
+- Para Série Branca com dois valores (% e /µL), use SEMPRE o valor absoluto em /µL
+- Exemplo: "Neutrófilos 41,1 % 1.669 /µL" → value: 1669, unit: "/µL"
+- Números com ponto como separador de milhar: "4.060" → 4060, "301.000" → 301000
+- Números com vírgula decimal: "1,05" → 1.05, "13,7" → 13.7
 
-HEMOGRAMA SÉRIE VERMELHA:
-  erythrocytes (Eritrócitos/Hemácias), hemoglobin (Hemoglobina g/dL), hematocrit (Hematócrito),
-  vcm (VCM), hcm (HCM), chcm (CHCM), rdw (RDW)
+MAPEAMENTO DE NOMES (Previlab/DASA → key):
+  Eritrócitos → erythrocytes
+  Hemoglobina → hemoglobin
+  Hematócrito → hematocrit
+  VCM → vcm
+  HCM → hcm
+  CHCM → chcm
+  RDW → rdw
+  Leucócitos → leukocytes (valor absoluto /µL)
+  Neutrófilos → neutrophils (valor absoluto /µL)
+  Eosinófilos → eosinophils (valor absoluto /µL)
+  Basófilos → basophils (valor absoluto /µL)
+  Linfócitos → lymphocytes (valor absoluto /µL)
+  Monócitos → monocytes (valor absoluto /µL)
+  Contagem de Plaquetas / Plaquetas → platelets
+  VPM → vpm
+  Vitamina B-12, Dosagem / Vitamina B12 / Cobalamina → vitamin_b12
+  25-Hidroxivitamina D / Vitamina D → vitamin_d
+  Glicose → glucose
+  Hemoglobina Glicada - HbA1c / HbA1c → hba1c
+  Glicose Média Estimada (GME) / eAG → estimated_average_glucose
+  Colesterol Total → cholesterol
+  LDL - Colesterol (calculado) / LDL Colesterol → ldl
+  HDL - Colesterol / HDL Colesterol → hdl
+  VLDL - Colesterol / VLDL → vldl
+  Triglicérides / Triglicerídeos → triglycerides
+  Creatinina → creatinine
+  *eGFR / TFG estimada / Taxa de Filtração Glomerular → egfr
+  Ácido Úrico → uric_acid
+  Transaminase pirúvica - TGP / ALT / TGP → alt
+  Transaminase oxalacética - TGO / AST / TGO → ast
+  Creatinofosfoquinase (CPK) / CK / CPK → cpk
+  Gama Glutamil Transferase (GGT) / GGT → ggt
+  Fosfatase Alcalina → alkaline_phosphatase
+  Bilirrubina Total → bilirubin_total
+  Bilirrubina Direta → bilirubin_direct
+  Bilirrubina Indireta → bilirubin_indirect
+  Hormônio Tireoestimulante Ultrassensível (TSH) / TSH → tsh
+  T4 Livre / Tiroxina Livre → t4
+  T3 Livre → t3
+  Ferritina → ferritin
+  Ferro Sérico → iron
+  PSA Total / Antígeno Prostático Específico Total → psa_total
+  PSA Livre → psa_free
+  Testosterona Total → testosterone
+  Proteína C Reativa / PCR → crp
+  PCR Ultrassensível → crp_ultra
+  Homocisteína → homocysteine
+  Sódio → sodium
+  Potássio → potassium
+  Cálcio → calcium
+  Magnésio → magnesium
+  Fósforo → phosphorus
+  Urina - Densidade → urine_density
+  Urina - pH → urine_ph
+  Urina - Leucócitos → urine_leukocytes
+  Urina - Hemácias → urine_erythrocytes
 
-HEMOGRAMA SÉRIE BRANCA:
-  leukocytes (Leucócitos total), neutrophils (Neutrófilos absolutos),
-  lymphocytes (Linfócitos absolutos), monocytes (Monócitos absolutos),
-  eosinophils (Eosinófilos absolutos), basophils (Basófilos absolutos), platelets (Plaquetas)
+PARA QUALQUER OUTRO MARCADOR não listado: crie key em snake_case descritivo.
 
-FUNÇÃO RENAL:
-  creatinine (Creatinina), urea (Ureia), egfr (TFG/eGFR/MDRD), uric_acid (Ácido Úrico), microalbumin (Microalbuminúria)
-
-FUNÇÃO HEPÁTICA:
-  ast (AST/TGO), alt (ALT/TGP), ggt (GGT/Gama-GT), alkaline_phosphatase (Fosfatase Alcalina),
-  total_bilirubin (Bilirrubina Total), direct_bilirubin (Bilirrubina Direta),
-  indirect_bilirubin (Bilirrubina Indireta), albumin (Albumina), total_protein (Proteínas Totais)
-
-TIREOIDE:
-  tsh (TSH), t4 (T4 Livre/FT4), t3 (T3 Livre/FT3), t4_total (T4 Total), t3_total (T3 Total), anti_tpo (Anti-TPO)
-
-VITAMINAS & MINERAIS:
-  vitamin_d (Vitamina D/25-OH), vitamin_b12 (Vitamina B12/Cobalamina), folate (Folato/Ácido Fólico),
-  ferritin (Ferritina), iron (Ferro Sérico), tibc (TIBC/Capacidade Ligação Ferro),
-  transferrin_sat (Saturação Transferrina), calcium (Cálcio), magnesium (Magnésio),
-  phosphorus (Fósforo), zinc (Zinco)
-
-PRÓSTATA & ONCOLOGIA:
-  psa_total (PSA Total), psa_free (PSA Livre), psa_ratio (Relação PSA Livre/Total),
-  cea (CEA/Antígeno Carcinoembrio), ca125 (CA-125), ca199 (CA 19-9), afp (AFP/Alfa-fetoproteína)
-
-CARDIOVASCULAR:
-  crp (PCR/Proteína C Reativa), crp_ultra (PCR Ultrassensível), homocysteine (Homocisteína), fibrinogen (Fibrinogênio)
-
-HORMÔNIOS:
-  testosterone (Testosterona Total), testosterone_free (Testosterona Livre),
-  lh (LH), fsh (FSH), estradiol (Estradiol), progesterone (Progesterona),
-  prolactin (Prolactina), dheas (DHEA-S), cortisol (Cortisol)
-
-ELETRÓLITOS:
-  sodium (Sódio/Na), potassium (Potássio/K), chloride (Cloro/Cl), bicarbonate (Bicarbonato)
-
-- Para marcadores NÃO listados acima, crie uma key em snake_case
-- Responda APENAS com JSON válido, sem texto antes ou depois
-- Extraia a DATA do exame no formato YYYY-MM-DD
-- Se houver valores percentuais E absolutos do diferencial leucocitário, prefira os ABSOLUTOS (/µL)
-
-FORMATO OBRIGATÓRIO:
-{"markers":[{"key":"glucose","name":"Glicose","value":95,"unit":"mg/dL"},{"key":"hemoglobin","name":"Hemoglobina","value":14.1,"unit":"g/dL"},{"key":"psa_total","name":"PSA Total","value":0.6,"unit":"ng/mL"}],"date":"2025-09-27","exam_type":"Hemograma Completo"}`;
+FORMATO DE SAÍDA — Responda APENAS com JSON válido, sem texto antes ou depois:
+{"markers":[{"key":"glucose","name":"Glicose","value":94,"unit":"mg/dL"},{"key":"hemoglobin","name":"Hemoglobina","value":14.1,"unit":"g/dL"},{"key":"psa_total","name":"PSA Total","value":0.6,"unit":"ng/mL"}],"date":"2026-01-08","exam_type":"Hemograma Completo"}`;
 
 // FIX: consolidated fIdx — removed duplicate const fIdx2, now using single fIdxMark
 async function importExtractedMarkers(extracted, fileObj) {
-  // Prevent duplicate extraction of same file
+  // Allow re-extraction — deduplication is handled per marker+date below
   const fIdx = S.files.findIndex(x => x.name === fileObj?.name);
-  if (fIdx >= 0 && S.files[fIdx].extracted) {
-    toast('⚠️ Este arquivo já foi extraído anteriormente.', 'warn');
-    return;
-  }
 
   let count = 0;
   let skipped = 0;
@@ -1750,7 +1777,7 @@ function renderFiles() {
     </div>
     <div class="file-actions">
       <button class="file-btn" onclick="viewFile('${f.id}')">👁️ Ver</button>
-      ${!f.extracted && f.type !== 'other' ? `<button class="file-btn" style="color:var(--accent);" onclick="reExtractFile('${f.id}')">🧬 Extrair</button>` : ''}
+      ${f.type !== 'other' ? `<button class="file-btn" style="color:${f.extracted?'var(--text3)':'var(--accent)'};" onclick="reExtractFile('${f.id}')">${f.extracted?'🔄 Re-extrair':'🧬 Extrair'}</button>` : ''}
       <button class="file-btn del" onclick="deleteFile('${f.id}')">🗑️</button>
     </div>
   </div>`).join('');
@@ -1821,9 +1848,56 @@ async function reExtractFile(id) {
   const f = S.files.find(x=>x.id===id);
   if (!f) return;
   if (!cfg.geminiKey) { toast('Configure a chave Gemini para extração com IA', 'warn'); navigate('settings'); return; }
-  if (!f.localBlob) { toast('Arquivo não disponível. Faça um novo upload.', 'info'); return; }
+
   S.extracting = true;
-  try { await extractMarkersFromFile(f.localBlob, f); } finally { S.extracting = false; }
+  toast(`⏳ Preparando "${f.name}"...`, 'info');
+
+  try {
+    // 1. Use localBlob if available (freshly uploaded)
+    if (f.localBlob) {
+      await extractMarkersFromFile(f.localBlob, f);
+      return;
+    }
+
+    // 2. Fetch from Supabase Storage (persisted files)
+    if (cfg.supabaseUrl && cfg.supabaseKey) {
+      const token = cfg.supabaseToken || cfg.supabaseKey;
+      const storagePath = f.storagePath || `${S.user?.id||'shared'}/${f.id}_${f.name}`;
+      // Get signed URL
+      const signResp = await fetch(`${cfg.supabaseUrl}/storage/v1/object/sign/healthhome-records/${storagePath}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresIn: 300 })
+      });
+      if (!signResp.ok) throw new Error('Não foi possível obter URL do arquivo');
+      const { signedURL } = await signResp.json();
+      const fileUrl = signedURL.startsWith('http') ? signedURL : `${cfg.supabaseUrl}/storage/v1${signedURL}`;
+
+      // Download file as Blob
+      const fileResp = await fetch(fileUrl);
+      if (!fileResp.ok) throw new Error('Erro ao baixar arquivo do storage');
+      const blob = await fileResp.blob();
+      const file = new File([blob], f.name, { type: blob.type || 'application/pdf' });
+
+      // Store blob for future use
+      S.blobUrls = S.blobUrls || {};
+      S.blobUrls[f.id] = URL.createObjectURL(blob);
+      f.localBlob = file;
+
+      // Reset extracted flag to allow re-extraction
+      const fIdx = S.files.findIndex(x => x.id === id);
+      if (fIdx >= 0) S.files[fIdx].extracted = false;
+
+      await extractMarkersFromFile(file, f);
+      return;
+    }
+
+    toast('Arquivo não disponível localmente e Supabase não configurado.', 'warn');
+  } catch(e) {
+    toast(`Erro: ${e.message}`, 'error');
+  } finally {
+    S.extracting = false;
+  }
 }
 
 function deleteFile(id) {
