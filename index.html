@@ -609,6 +609,7 @@ nav{flex:1;padding:16px 12px;overflow-y:auto;}
             <div style="display:flex;flex-direction:column;gap:10px;">
               <div class="alert-box warn"><span>⚠️</span><span class="alert-text">Aviso LGPD: MVP de testes. Não use dados reais de pacientes sem criptografia e conformidade legal.</span></div>
               <button class="btn" style="background:rgba(248,113,113,0.1);color:var(--danger);border:1px solid rgba(248,113,113,0.2);" onclick="clearAllData()">🗑️ Limpar todos os dados locais</button>
+              <button class="btn" style="background:rgba(251,191,36,0.1);color:var(--warn);border:1px solid rgba(251,191,36,0.2);" onclick="resetMarkers()">🔄 Resetar marcadores (apaga duplicatas)</button>
             </div>
           </div>
         </div>
@@ -701,12 +702,24 @@ async function loadFromSupabase() {
     ]);
 
     if (markers.status === 'fulfilled' && markers.value?.length) {
+      // FIX: Build markers from DB as {value, date} objects, deduplicated by marker_key+recorded_at
       const grouped = {};
       markers.value.forEach(m => {
         if (!grouped[m.marker_key]) grouped[m.marker_key] = [];
-        grouped[m.marker_key].unshift(parseFloat(m.value) || m.value);
+        const dateStr = m.recorded_at ? m.recorded_at.slice(0,10) : null;
+        const val = parseFloat(m.value);
+        if (isNaN(val)) return;
+        // Deduplicate: skip if same key+date+value already exists
+        const exists = grouped[m.marker_key].some(e =>
+          typeof e === 'object' ? e.date === dateStr && e.value === val : false
+        );
+        if (!exists) grouped[m.marker_key].push({ value: val, date: dateStr });
       });
-      S.markers = { ...S.markers, ...grouped };
+      // Sort each marker array by date ascending
+      Object.keys(grouped).forEach(k => {
+        grouped[k].sort((a,b) => (a.date||'').localeCompare(b.date||''));
+      });
+      S.markers = grouped; // replace entirely with DB truth (don't merge with stale localStorage)
       localStorage.setItem('hh_markers', JSON.stringify(S.markers));
     }
     if (timeline.status === 'fulfilled' && timeline.value?.length) {
@@ -719,7 +732,21 @@ async function loadFromSupabase() {
       S.timeline = merged.sort((a,b) => b.date?.localeCompare(a.date));
     }
     if (patients.status === 'fulfilled' && patients.value?.length) S.patients = patients.value;
-    if (files.status === 'fulfilled' && files.value?.length) S.files = files.value;
+    if (files.status === 'fulfilled' && files.value?.length) {
+      // FIX: Map DB document rows to fileObj shape used by renderFiles()
+      S.files = files.value.map(f => ({
+        id: f.id,
+        name: f.name,
+        size: f.size || '—',
+        type: f.type || 'other',
+        date: f.uploaded_at ? new Date(f.uploaded_at).toLocaleDateString('pt-BR') : '—',
+        category: f.category || guessCategory(f.name||''),
+        storagePath: f.storage_path || f.storagePath || '',
+        extracted: f.extracted || false,
+        localUrl: null,
+        localBlob: null,
+      }));
+    }
     return true;
   } catch(e) { console.error('Supabase load:', e); return false; }
 }
@@ -1474,6 +1501,16 @@ async function handleFiles(files) {
           const errBody = await r.json().catch(()=>({message: r.statusText}));
           throw new Error(errBody.message || errBody.error || r.statusText);
         }
+        // FIX: Save document metadata to Supabase documents table for persistence
+        const docMeta = {
+          id, user_id: S.user?.id || 'anon',
+          name: file.name, size: sizeFmt, type,
+          category: guessCategory(file.name),
+          storage_path: `${userId}/${id}_${file.name}`,
+          extracted: false,
+          uploaded_at: new Date().toISOString()
+        };
+        await sbFetch('documents', { method:'POST', body: JSON.stringify(docMeta) }).catch(e => console.warn('Doc meta save:', e.message));
         toast(`${file.name} enviado com sucesso!`,'success');
       } catch(e) {
         console.error('Storage upload error:', e);
@@ -1486,8 +1523,8 @@ async function handleFiles(files) {
     const localUrl = URL.createObjectURL(file);
     S.blobUrls = S.blobUrls || {};
     S.blobUrls[id] = localUrl;
-    const userId = S.user?.id || 'shared';
-    const storagePath = `${userId}/${id}_${file.name}`;
+    const userId2 = S.user?.id || 'shared';
+    const storagePath = `${userId2}/${id}_${file.name}`;
     const fileObj = {id, name:file.name, size:sizeFmt, type, date:new Date().toLocaleDateString('pt-BR'), category:guessCategory(file.name), localUrl, localBlob: file, extracted: false, storagePath};
     S.files.unshift(fileObj);
     renderFiles();
@@ -1650,9 +1687,18 @@ async function importExtractedMarkers(extracted, fileObj) {
     localStorage.setItem('hh_timeline', JSON.stringify(S.timeline));
     await saveEventToSupabase(ev);
   }
-  // FIX: use fIdxMark instead of re-declaring fIdx (was causing duplicate const error)
+  // Mark as extracted locally and in Supabase
   const fIdxMark = S.files.findIndex(x => x.name === fileObj?.name);
-  if (fIdxMark >= 0) S.files[fIdxMark].extracted = true;
+  if (fIdxMark >= 0) {
+    S.files[fIdxMark].extracted = true;
+    const docId = S.files[fIdxMark].id;
+    if (docId && cfg.supabaseUrl && cfg.supabaseKey && !S.demo) {
+      sbFetch(`documents?id=eq.${docId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ extracted: true })
+      }).catch(e => console.warn('Mark extracted:', e.message));
+    }
+  }
   document.getElementById('extractionPanel').style.display='none';
   renderDashboard();
   renderFiles();
@@ -2287,6 +2333,22 @@ function saveProfile() {
 function clearAllData() {
   if (!confirm('Apagar todos os dados locais? Esta ação é irreversível.')) return;
   localStorage.clear(); location.reload();
+}
+
+async function resetMarkers() {
+  if (!confirm('Isso vai apagar TODOS os marcadores do Supabase e locais. Continuar?')) return;
+  // Clear local
+  S.markers = {};
+  localStorage.removeItem('hh_markers');
+  // Clear Supabase health_markers for this user
+  if (cfg.supabaseUrl && cfg.supabaseKey && S.user && !S.demo) {
+    try {
+      await sbFetch(`health_markers?user_id=eq.${S.user.id}`, { method: 'DELETE' });
+      toast('✅ Marcadores apagados do banco de dados.', 'success');
+    } catch(e) { toast('Erro ao apagar do banco: ' + e.message, 'error'); }
+  }
+  renderDashboard();
+  toast('Marcadores resetados!', 'success');
 }
 
 function saveConfig() { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
