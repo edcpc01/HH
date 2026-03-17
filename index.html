@@ -746,6 +746,7 @@ async function loadFromSupabase() {
         localUrl: null,
         localBlob: null,
       }));
+      loadExtractedState(); // Restore extracted flags from localStorage
     }
     return true;
   } catch(e) { console.error('Supabase load:', e); return false; }
@@ -1510,8 +1511,8 @@ async function handleFiles(files) {
           name: file.name, size: sizeFmt, type,
           category: guessCategory(file.name),
           storage_path: `${userId}/${id}_${file.name}`,
-          extracted: false,
           uploaded_at: new Date().toISOString()
+          // Note: 'extracted' is NOT a DB column — tracked in localStorage only
         };
         await sbFetch('documents', { method:'POST', body: JSON.stringify(docMeta) }).catch(e => console.warn('Doc meta save:', e.message));
         toast(`${file.name} enviado com sucesso!`,'success');
@@ -1699,17 +1700,11 @@ async function importExtractedMarkers(extracted, fileObj) {
     localStorage.setItem('hh_timeline', JSON.stringify(S.timeline));
     await saveEventToSupabase(ev);
   }
-  // Mark as extracted locally and in Supabase
+  // Mark as extracted locally + persist in localStorage (no DB column needed)
   const fIdxMark = S.files.findIndex(x => x.name === fileObj?.name);
   if (fIdxMark >= 0) {
     S.files[fIdxMark].extracted = true;
-    const docId = S.files[fIdxMark].id;
-    if (docId && cfg.supabaseUrl && cfg.supabaseKey && !S.demo) {
-      sbFetch(`documents?id=eq.${docId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ extracted: true })
-      }).catch(e => console.warn('Mark extracted:', e.message));
-    }
+    saveExtractedState();
   }
   document.getElementById('extractionPanel').style.display='none';
   renderDashboard();
@@ -2360,14 +2355,10 @@ async function resetMarkers() {
       await Promise.all([
         sbFetch(`health_markers?user_id=eq.${S.user.id}`, { method: 'DELETE' }),
         sbFetch(`timeline_events?user_id=eq.${S.user.id}`, { method: 'DELETE' }),
-        // Reset extracted flag on all documents so they can be re-extracted
-        sbFetch(`documents?user_id=eq.${S.user.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ extracted: false })
-        }),
       ]);
-      // Also reset local files extracted flag
+      // Reset extracted flag locally only (no DB column)
       S.files = S.files.map(f => ({...f, extracted: false}));
+      localStorage.removeItem('hh_extracted_docs');
       renderFiles();
       toast('✅ Dados resetados! Agora faça a extração dos laudos novamente.', 'success');
     } catch(e) { toast('Erro ao resetar banco: ' + e.message, 'error'); }
@@ -2376,6 +2367,19 @@ async function resetMarkers() {
 }
 
 function saveConfig() { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
+
+// Track which documents have been extracted (by id) in localStorage
+function saveExtractedState() {
+  const extracted = S.files.filter(f => f.extracted).map(f => f.id);
+  localStorage.setItem('hh_extracted_docs', JSON.stringify(extracted));
+}
+
+function loadExtractedState() {
+  try {
+    const ids = JSON.parse(localStorage.getItem('hh_extracted_docs') || '[]');
+    S.files = S.files.map(f => ({...f, extracted: ids.includes(f.id)}));
+  } catch(e) {}
+}
 
 function updateDbStatus(ok) {
   const dot = document.getElementById('dbDot');
