@@ -1257,9 +1257,33 @@ function showMarkerEvolution(key) {
   if (mainChart) mainChart.destroy();
   const ctx = document.getElementById('mainChart').getContext('2d');
   const rawData = S.markers[key] || [];
-  // FIX: show ONLY points with real laudo dates — no fake monthly estimates
+
+  // Build plotData: prefer {value, date} objects; for plain numbers, try to
+  // correlate with exam dates from timeline (sorted oldest→newest).
   const datedEntries = rawData.filter(d => typeof d === 'object' && d.date);
-  const plotData = datedEntries.length > 0 ? datedEntries : rawData.map(d => ({value: typeof d === 'object' ? d.value : d, date: null}));
+
+  let plotData;
+  if (datedEntries.length > 0) {
+    // All entries have date — use them directly, sorted by date asc
+    plotData = [...datedEntries].sort((a, b) => a.date.localeCompare(b.date));
+  } else {
+    // Legacy plain numbers from Supabase — correlate with timeline exam dates
+    const examDates = [...S.timeline]
+      .filter(e => e.type === 'exam' && e.date)
+      .map(e => e.date)
+      .sort((a, b) => a.localeCompare(b)); // oldest first
+
+    const plainValues = rawData.map(d => typeof d === 'object' ? d.value : d);
+    plotData = plainValues.map((val, i) => ({
+      value: val,
+      date: examDates[i] || null  // match by index (oldest exam = first value)
+    }));
+  }
+
+  // Filter out entries still without date only if we have some with date
+  const hasAnyDate = plotData.some(d => d.date);
+  if (hasAnyDate) plotData = plotData.filter(d => d.date);
+
   const data = plotData.map(d => d.value ?? d);
   const labels = plotData.map((d, i) => d.date
     ? new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'})
