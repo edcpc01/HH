@@ -756,9 +756,12 @@ async function saveMarkerToSupabase(key, value, date) {
   try {
     if (!S.user || S.demo) return;
     const recorded_at = date ? new Date(date).toISOString() : new Date().toISOString();
+    const userId = S.user?.id || S.user?.email || 'anon';
+    // Use upsert (onConflict) to prevent DB duplicates for same user+key+date
     await sbFetch('health_markers', {
       method: 'POST',
-      body: JSON.stringify({ user_id: S.user?.id || S.user?.email || 'anon', marker_key: key, value: parseFloat(value), recorded_at })
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({ user_id: userId, marker_key: key, value: parseFloat(value), recorded_at })
     });
   } catch(e) { console.warn('Save marker to DB failed (saving locally only):', e.message); }
 }
@@ -1670,16 +1673,25 @@ async function importExtractedMarkers(extracted, fileObj) {
   }
 
   let count = 0;
+  let skipped = 0;
   const examDate = extracted.date || new Date().toISOString().slice(0,10);
   for (const m of extracted.markers) {
     const key = m.key;
     const val = parseFloat(m.value);
     if (!key || m.value === null || m.value === undefined || isNaN(val)) continue;
     if (!S.markers[key]) S.markers[key] = [];
+    // FIX: Deduplicate — skip if same (key + date + value) already exists locally
+    const alreadyLocal = S.markers[key].some(e =>
+      typeof e === 'object'
+        ? e.date === examDate && Math.abs(e.value - val) < 0.001
+        : false
+    );
+    if (alreadyLocal) { skipped++; continue; }
     S.markers[key].push({ value: val, date: examDate });
     await saveMarkerToSupabase(key, val, examDate);
     count++;
   }
+  if (skipped > 0) console.log(`[importExtractedMarkers] ${skipped} marcadores ignorados (duplicatas por data)`);
   localStorage.setItem('hh_markers', JSON.stringify(S.markers));
   if (extracted.date || extracted.exam_type) {
     const ev = {id:Date.now(),date:extracted.date||new Date().toISOString().slice(0,10),type:'exam',title:extracted.exam_type||'Exame Importado',desc:`${count} marcadores importados via IA.`,tags:['IA','Importado']};
@@ -2336,19 +2348,31 @@ function clearAllData() {
 }
 
 async function resetMarkers() {
-  if (!confirm('Isso vai apagar TODOS os marcadores do Supabase e locais. Continuar?')) return;
-  // Clear local
+  if (!confirm('Isso vai apagar TODOS os marcadores e eventos da timeline do Supabase e locais.\n\nUse isso para corrigir duplicatas. Os documentos (laudos) NÃO serão apagados.\n\nContinuar?')) return;
+  // Clear local state
   S.markers = {};
+  S.timeline = [];
   localStorage.removeItem('hh_markers');
-  // Clear Supabase health_markers for this user
+  localStorage.removeItem('hh_timeline');
+  // Clear Supabase for this user
   if (cfg.supabaseUrl && cfg.supabaseKey && S.user && !S.demo) {
     try {
-      await sbFetch(`health_markers?user_id=eq.${S.user.id}`, { method: 'DELETE' });
-      toast('✅ Marcadores apagados do banco de dados.', 'success');
-    } catch(e) { toast('Erro ao apagar do banco: ' + e.message, 'error'); }
+      await Promise.all([
+        sbFetch(`health_markers?user_id=eq.${S.user.id}`, { method: 'DELETE' }),
+        sbFetch(`timeline_events?user_id=eq.${S.user.id}`, { method: 'DELETE' }),
+        // Reset extracted flag on all documents so they can be re-extracted
+        sbFetch(`documents?user_id=eq.${S.user.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ extracted: false })
+        }),
+      ]);
+      // Also reset local files extracted flag
+      S.files = S.files.map(f => ({...f, extracted: false}));
+      renderFiles();
+      toast('✅ Dados resetados! Agora faça a extração dos laudos novamente.', 'success');
+    } catch(e) { toast('Erro ao resetar banco: ' + e.message, 'error'); }
   }
   renderDashboard();
-  toast('Marcadores resetados!', 'success');
 }
 
 function saveConfig() { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
