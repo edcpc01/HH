@@ -707,11 +707,13 @@ async function loadFromSupabase() {
       markers.value.forEach(m => {
         if (!grouped[m.marker_key]) grouped[m.marker_key] = [];
         const dateStr = m.recorded_at ? m.recorded_at.slice(0,10) : null;
-        const val = parseFloat(m.value);
+        let val = parseFloat(m.value);
         if (isNaN(val)) return;
+        // Normalize erythrocytes: DB may have 4660000 instead of 4.66
+        if (m.marker_key === 'erythrocytes' && val > 100) val = parseFloat((val / 1000000).toFixed(2));
         // Deduplicate: skip if same key+date+value already exists
         const exists = grouped[m.marker_key].some(e =>
-          typeof e === 'object' ? e.date === dateStr && e.value === val : false
+          typeof e === 'object' ? e.date === dateStr && Math.abs(e.value - val) < 0.001 : false
         );
         if (!exists) grouped[m.marker_key].push({ value: val, date: dateStr });
       });
@@ -1572,18 +1574,20 @@ async function extractMarkersFromFile(file, fileObj) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
         let pdfText = '';
-        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+        const totalPages = pdf.numPages;
+        for (let i = 1; i <= totalPages; i++) {
           const page = await pdf.getPage(i);
           const tc = await page.getTextContent();
           pdfText += tc.items.map(item => item.str).join(' ') + '\n';
         }
-        fileContext = pdfText.slice(0, 8000);
-        console.log('PDF extraído:', fileContext.length, 'chars');
+        // Use up to 16000 chars to capture all exams in multi-page laudos
+        fileContext = pdfText.slice(0, 16000);
+        console.log(`PDF extraído: ${totalPages} páginas, ${fileContext.length} chars`);
       } catch(e) {
         fileContext = 'Exame médico em PDF.';
       }
     }
-    const text = await callGemini(`${EXTRACT_PROMPT}\n\nConteúdo do exame:\n${fileContext}`, 1000);
+    const text = await callGemini(`${EXTRACT_PROMPT}\n\nConteúdo do exame:\n${fileContext}`, 2000);
     let jsonStr = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Nenhum JSON na resposta da IA');
@@ -1598,17 +1602,25 @@ async function extractMarkersFromFile(file, fileObj) {
 
     window.currentFileObj = fileObj;
 
+    // Check which expected markers are missing
+    const EXPECTED = ['glucose','hemoglobin','hematocrit','erythrocytes','leukocytes','cholesterol','hdl','triglycerides','vitamin_d','vitamin_b12'];
+    const extractedKeys = extracted.markers.map(m => m.key);
+    const missing = EXPECTED.filter(k => !extractedKeys.includes(k));
+
     panel.innerHTML = `<div class="extract-result">
-      <div class="extract-title">🧬 Marcadores extraídos de "${fileObj.name}"</div>
+      <div class="extract-title">🧬 ${extracted.markers.length} marcadores extraídos de "${fileObj.name}"</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;max-height:300px;overflow-y:auto;">
       ${extracted.markers.map(m=>`
-        <div class="extract-marker">
-          <span>${m.name}</span>
-          <span style="font-weight:600;color:var(--accent);">${m.value} ${m.unit||''}</span>
+        <div class="extract-marker" style="grid-column:span 1;">
+          <span style="font-size:11px;">${m.name}</span>
+          <span style="font-weight:600;color:var(--accent);font-size:12px;">${m.value} ${m.unit||''}</span>
         </div>`).join('')}
-      ${extracted.date?`<div style="font-size:11px;color:var(--text3);margin-top:6px;">Data do exame: ${extracted.date}</div>`:''}
+      </div>
+      ${extracted.date?`<div style="font-size:11px;color:var(--text3);margin-top:6px;">📅 Data: ${extracted.date} | Exame: ${extracted.exam_type||'—'}</div>`:''}
+      ${missing.length?`<div style="font-size:11px;color:var(--warn);margin-top:6px;">⚠️ Não encontrados: ${missing.map(k=>MARKER_META[k]?.label||k).join(', ')}</div>`:''}
     </div>`;
 
-    toast('🧬 Marcadores encontrados! Importando automaticamente...', 'success');
+    toast(\`🧬 \${extracted.markers.length} marcadores encontrados! Importando...\`, 'success');
     await importExtractedMarkers(extracted, fileObj);
   } catch(e) {
     panel.innerHTML=`<div class="extract-result"><div class="extract-title" style="color:var(--warn);">⚠️ Erro na extração: ${e.message}</div></div>`;
@@ -1631,6 +1643,9 @@ REGRA CRÍTICA — VALORES CORRETOS:
 - Exemplo: "Neutrófilos 41,1 % 1.669 /µL" → value: 1669, unit: "/µL"
 - Números com ponto como separador de milhar: "4.060" → 4060, "301.000" → 301000
 - Números com vírgula decimal: "1,05" → 1.05, "13,7" → 13.7
+- ERITRÓCITOS: o laudo mostra "4,66 10^6/µL" — extraia SOMENTE o número decimal: value: 4.66 (NUNCA 4660000)
+- ATENÇÃO: valores como "4,66 x 10^6" ou "4,66 10^6/µL" → value: 4.66
+- Plaquetas: "301.000 /µL" → value: 301000 (número inteiro, separador de milhar)
 
 MAPEAMENTO DE NOMES (Previlab/DASA → key):
   Eritrócitos → erythrocytes
@@ -1648,16 +1663,16 @@ MAPEAMENTO DE NOMES (Previlab/DASA → key):
   Monócitos → monocytes (valor absoluto /µL)
   Contagem de Plaquetas / Plaquetas → platelets
   VPM → vpm
-  Vitamina B-12, Dosagem / Vitamina B12 / Cobalamina → vitamin_b12
-  25-Hidroxivitamina D / Vitamina D → vitamin_d
-  Glicose → glucose
-  Hemoglobina Glicada - HbA1c / HbA1c → hba1c
-  Glicose Média Estimada (GME) / eAG → estimated_average_glucose
-  Colesterol Total → cholesterol
-  LDL - Colesterol (calculado) / LDL Colesterol → ldl
-  HDL - Colesterol / HDL Colesterol → hdl
-  VLDL - Colesterol / VLDL → vldl
-  Triglicérides / Triglicerídeos → triglycerides
+  Vitamina B-12, Dosagem / Vitamina B12 / Vitamina B 12 / Cobalamina / Cianocobalamina → vitamin_b12
+  25-Hidroxivitamina D / Vitamina D / 25(OH)D / 25 OH Vitamina D / Calcifediol → vitamin_d
+  Glicose / Glicemia / Glicemia de Jejum / Glicemia em Jejum / Glicose em Jejum → glucose
+  Hemoglobina Glicada - HbA1c / HbA1c / Hemoglobina Glicada / Hb Glicada → hba1c
+  Glicose Média Estimada (GME) / eAG / Glicemia Média Estimada → estimated_average_glucose
+  Colesterol Total / Colesterol / Col. Total → cholesterol
+  LDL - Colesterol (calculado) / LDL Colesterol / Colesterol LDL / LDL-C → ldl
+  HDL - Colesterol / HDL Colesterol / Colesterol HDL / HDL-C → hdl
+  VLDL - Colesterol / VLDL Colesterol / Colesterol VLDL / VLDL-C → vldl
+  Triglicérides / Triglicerídeos / Triglicerideos / TG → triglycerides
   Creatinina → creatinine
   *eGFR / TFG estimada / Taxa de Filtração Glomerular → egfr
   Ácido Úrico → uric_acid
@@ -1708,6 +1723,10 @@ async function importExtractedMarkers(extracted, fileObj) {
     const val = parseFloat(m.value);
     if (!key || m.value === null || m.value === undefined || isNaN(val)) continue;
     if (!S.markers[key]) S.markers[key] = [];
+    // Normalize erythrocytes: IA sometimes returns 4660000 instead of 4.66
+    if (key === 'erythrocytes' && val > 100) val = parseFloat((val / 1000000).toFixed(2));
+    // Normalize platelets stored as small number: if < 1000 and key=platelets, multiply
+    // (some labs: "301" meaning 301x10^3 — but we prefer full value so skip this)
     // FIX: Deduplicate — skip if same (key + date + value) already exists locally
     const alreadyLocal = S.markers[key].some(e =>
       typeof e === 'object'
