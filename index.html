@@ -1210,7 +1210,7 @@ function renderMarkersTable() {
     const raw = S.markers[k]?.at(-1); const v = typeof raw === 'object' ? raw?.value : raw;
     if (v === undefined || v === null) return '';
     const meta = MARKER_META[k] || { label: k, unit: '', ref: [0, 9999], color: '#7fa5c8' };
-    const [lo, hi] = meta.ref;
+    const [lo, hi] = meta.ref || [0, 9999];
     const pct = hi > 0 ? Math.min(100, (v / (hi * 1.3)) * 100) : 50;
     const bad = v > hi * 1.15 || v < lo * 0.85;
     const ok = v >= lo && v <= hi;
@@ -1283,7 +1283,10 @@ function renderStats() {
     const bad = !isNaN(n) && (n > hi*1.15 || n < lo*0.85);
     const ok = !isNaN(n) && n >= lo && n <= hi;
     const color = bad ? 'var(--danger)' : ok ? 'var(--success)' : 'var(--warn)';
-    const delta = S.markers[k]?.length > 1 ? (S.markers[k].at(-1) - S.markers[k].at(-2)).toFixed(1) : null;
+    const _last = S.markers[k]?.at(-1); const _prev = S.markers[k]?.at(-2);
+    const _lastV = typeof _last === 'object' ? _last?.value : _last;
+    const _prevV = typeof _prev === 'object' ? _prev?.value : _prev;
+    const delta = (S.markers[k]?.length > 1 && _lastV != null && _prevV != null) ? (_lastV - _prevV).toFixed(1) : null;
     return `<div class="stat-card" style="cursor:pointer;border-color:${meta.color}22;" onclick="showMarkerEvolution('${k}')">
       <div class="stat-icon">${bad?'⚠️':ok?'✅':'📊'}</div>
       <div><span class="stat-value" style="color:${color};">${val}</span><span class="stat-unit"> ${unit}</span></div>
@@ -1944,7 +1947,7 @@ async function generateInsights() {
 Marcadores (último valor):
 ${Object.entries(S.markers).map(([k,v])=>{
   const m=MARKER_META[k];if(!m||!v?.length)return'';
-  return `- ${m.label}: ${v.at(-1)} ${m.unit} (ref: ${m.ref.join('–')})`;
+  return `- ${m.label}: ${v.at(-1)} ${m.unit} (ref: ${(m.ref||[0,9999]).join('–')})`;
 }).filter(Boolean).join('\n')}
 Tendências (6 últimos):
 ${['glucose','cholesterol','pressure_sys'].map(k=>`- ${MARKER_META[k]?.label}: ${(S.markers[k]||[]).slice(-6).join(', ')}`).join('\n')}
@@ -2305,7 +2308,7 @@ function renderProntuario() {
   document.getElementById('prontuarioVitals').innerHTML = vitalsKeys.map(k=>{
     const meta=MARKER_META[k]; const v=S.markers[k]?.at(-1);
     if (!v) return '';
-    const ok=v>=meta.ref[0]&&v<=meta.ref[1];
+    const ok=meta.ref && v>=meta.ref[0]&&v<=meta.ref[1];
     return `<div class="vital-card">
       <div class="vital-label">${meta.label}</div>
       <div class="vital-val" style="color:${ok?'var(--success)':'var(--warn)'};">${v}</div>
